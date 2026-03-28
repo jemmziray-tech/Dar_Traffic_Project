@@ -38,4 +38,4 @@ The data is pulled via API, processed in Python, and stored in continuously upda
 - [ ] Train a basic Machine Learning model to predict future delays based on historical weather.
 
 ---
-*Built by [Your Name/Username] - Data Engineering Portfolio Project*
+*Built by John Mziray - Data Engineering Portfolio Project*
