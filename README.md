@@ -1,34 +1,41 @@
-# 🚦 Dar es Salaam Live Traffic Scraper
+# 🚦 Dar es Salaam Traffic & Weather Intelligence Tracker
+
+![Data Auto-Scraper](https://github.com/jemmziray-tech/Dar_Traffic_Project/actions/workflows/traffic_scraper.yml/badge.svg)
 
 ## 📌 Project Overview
-This project is an automated Data Engineering pipeline designed to collect live traffic data in Dar es Salaam, Tanzania. Specifically, it tracks the travel time on Morogoro Road from the **Ubungo Interchange to Posta (Askari Monument)**. 
+An automated, cloud-based data engineering pipeline that monitors real-time traffic congestion and weather conditions on major arterial roads in Dar es Salaam, Tanzania. 
 
-Instead of relying on static reports, this scraper builds a proprietary, minute-by-minute longitudinal dataset to analyze traffic patterns, pinpoint exact *foleni* (traffic jam) peaks, and eventually train predictive machine learning models.
+This project creates a "Digital Twin" of the city's transport infrastructure, collecting high-resolution time-series data to measure the exact impact of rush hour, weather events, and daily commute patterns.
 
-## 🛠️ Tech Stack & Architecture
+## ✨ Key Features
+* **100% Cloud Automated:** Runs autonomously 24/7 using GitHub Actions. No local server required.
+* **Multi-Node Monitoring:** Currently tracking multiple key corridors (Morogoro Road and Bagamoyo Road).
+* **Weather Integration:** Cross-references traffic delays with live meteorological data to analyze the impact of rain on urban mobility.
+* **Smart Categorization:** Automatically calculates average speed (km/h) and assigns severity labels to traffic jams.
+
+## 🗄️ Data Architecture & Schema
+The data is pulled via API, processed in Python, and stored in continuously updating CSV files.
+
+| Column | Description | Data Type |
+| :--- | :--- | :--- |
+| `Timestamp` | Local time of data collection (UTC / EAT) | Datetime |
+| `Normal_Time_Mins` | Baseline travel time with zero traffic (Free-flow) | Integer |
+| `Live_Time_Mins` | Current estimated travel time | Integer |
+| `Delay_Mins` | Time lost due to congestion | Integer |
+| `Avg_Speed_kmh` | Calculated live speed of vehicles on the route | Float |
+| `Status` | Categorical severity (Smooth, Moderate, Heavy Jam) | String |
+| `Weather` | Current temperature and conditions (e.g., "26.0°C, Clear") | String |
+
+## 🛠️ Tech Stack
 * **Language:** Python 3.10
-* **Data Source:** TomTom Routing API
-* **Automation (CI/CD):** GitHub Actions
-* **Storage:** CSV (Time-series data)
-
-## ⚙️ How It Works
-1. A **GitHub Actions Cron Job** is scheduled to wake up every 15 minutes, 24/7.
-2. It spins up a temporary Ubuntu cloud server and runs `scrape_traffic.py`.
-3. The script pings the TomTom API securely using encrypted GitHub Secrets.
-4. It calculates the live traffic delay and appends a new row to `dar_morogoro_rd_traffic.csv`.
-5. The robot automatically commits and pushes the updated dataset back to this repository. **Zero manual intervention required.**
-
-## 📊 Data Dictionary
-The `dar_morogoro_rd_traffic.csv` file updates automatically. Here is what the data represents:
-
-| Column | Description |
-| :--- | :--- |
-| `Timestamp` | The exact Date and Time (EAT) the data was pulled. |
-| `Normal_Time_Mins` | The baseline travel time (in minutes) if the road is completely empty. |
-| `Live_Time_Mins` | The actual estimated travel time right now, factoring in current traffic. |
-| `Delay_Mins` | The time wasted in traffic (`Live_Time` - `Normal_Time`). |
+* **APIs:** TomTom Routing API (Traffic/Telematics), Open-Meteo API (Weather)
+* **Automation:** GitHub Actions (Cron Jobs)
+* **Storage:** CSV (Time-Series Database)
 
 ## 🚀 Future Roadmap
-* [ ] Collect 30+ days of continuous data.
-* [ ] Perform Exploratory Data Analysis (EDA) using `Pandas` and `Matplotlib`.
-* [ ] Build a dashboard visualizing the worst times to travel on Morogoro Road.
+- [ ] Build a Python Pandas/Matplotlib script to visualize the "Monday Morning Peak".
+- [ ] Add more arterial roads (e.g., Ali Hassan Mwinyi Rd, Nyerere Rd).
+- [ ] Train a basic Machine Learning model to predict future delays based on historical weather.
+
+---
+*Built by [Your Name/Username] - Data Engineering Portfolio Project*
