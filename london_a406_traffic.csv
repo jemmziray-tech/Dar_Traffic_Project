@@ -1,0 +1,11 @@
+Timestamp,Normal_Mins,Live_Mins,Delay_Mins,Avg_Speed_kmh,Status,Weather
+2026-03-29 15:26:56,36,39,3,28.0,Moderate,"28.4°C, Clear"
+2026-03-29 15:52:56,36,38,2,28.7,Moderate,"27.8°C, Clear"
+2026-03-29 16:22:56,37,39,2,28.0,Moderate,"27.3°C, Clear"
+2026-03-29 16:59:14,34,37,3,29.5,Moderate,"26.8°C, Clear"
+2026-03-29 17:31:27,33,34,1,32.1,Moderate,"26.1°C, Clear"
+2026-03-29 18:01:23,32,32,0,34.1,Smooth,"25.8°C, Clear"
+2026-03-29 19:01:38,30,31,1,35.2,Moderate,"25.2°C, Clear"
+2026-03-29 19:45:14,28,28,0,39.0,Smooth,"24.9°C, Clear"
+2026-03-29 20:19:42,27,27,0,40.4,Smooth,"24.7°C, Clear"
+2026-03-29 20:54:31,26,26,0,42.0,Smooth,"24.5°C, Clear"
