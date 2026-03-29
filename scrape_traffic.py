@@ -39,30 +39,49 @@ def get_weather():
 
 
 def get_traffic_data(road, weather):
-    url = f"https://api.tomtom.com/routing/1/calculateRoute/{road['start']}:{road['end']}/json?key={TOMTOM_KEY}"
+    # Added &traffic=true and &departAt=now to force real-time data
+    url = f"https://api.tomtom.com/routing/1/calculateRoute/{road['start']}:{road['end']}/json?key={TOMTOM_KEY}&traffic=true&departAt=now"
+
     try:
         data = requests.get(url).json()
         summary = data["routes"][0]["summary"]
+
+        # total travel time including current traffic
         live_m = summary["travelTimeInSeconds"] // 60
+        # actual delay compared to a clear road
         delay_m = summary["trafficDelayInSeconds"] // 60
+
+        # 'Normal' is the time it SHOULD take if there was zero traffic
+        # TomTom calls this 'noTrafficTravelTimeInSeconds' in some versions,
+        # but 'live - delay' is a solid way to calculate it here.
+        norm_m = live_m - delay_m
+
         speed = round(road["dist"] / (live_m / 60), 1)
-        status = (
-            "Smooth" if delay_m <= 5 else "Moderate" if delay_m <= 15 else "Heavy Jam"
-        )
+
+        # Enhanced status logic
+        if delay_m == 0:
+            status = "Smooth"
+        elif delay_m <= 7:
+            status = "Moderate"
+        else:
+            status = "Heavy Jam"
 
         save_to_csv(
             road["file"],
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            live_m - delay_m,
+            norm_m,
             live_m,
             delay_m,
             speed,
             status,
             weather,
         )
-        print(f"✅ {road['name']} updated. Weather: {weather}")
+        print(
+            f"✅ {road['name']} updated: {status} ({delay_m}m delay). Speed: {speed}kmh"
+        )
+
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error on {road['name']}: {e}")
 
 
 def save_to_csv(fn, ts, norm, live, dly, spd, stat, wthr):
