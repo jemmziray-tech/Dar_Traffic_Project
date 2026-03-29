@@ -20,11 +20,18 @@ ROADS = [
         "file": "dar_bagamoyo_rd_traffic.csv",
     },
     {
-        "name": "London_North_Circular",
-        "start": "51.6111,-0.1111",
-        "end": "51.5171,-0.2974",
-        "dist": 18.2,
-        "file": "london_a406_traffic.csv",
+        "name": "Ali_Hassan_Mwinyi_Rd",
+        "start": "-6.7720,39.2590",
+        "end": "-6.8005,39.2818",
+        "dist": 4.5,
+        "file": "dar_ali_hassan_mwinyi_traffic.csv",
+    },
+    {
+        "name": "Msimbazi_St_Kariakoo",
+        "start": "-6.8164,39.2730",
+        "end": "-6.8248,39.2785",
+        "dist": 1.5,
+        "file": "dar_msimbazi_kariakoo_traffic.csv",
     },
 ]
 
