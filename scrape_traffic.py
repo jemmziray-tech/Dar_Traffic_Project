@@ -19,6 +19,13 @@ ROADS = [
         "dist": 13.5,
         "file": "dar_bagamoyo_rd_traffic.csv",
     },
+    {
+        "name": "London_North_Circular",
+        "start": "51.6111,-0.1111",
+        "end": "51.5171,-0.2974",
+        "dist": 18.2,
+        "file": "london_a406_traffic.csv",
+    },
 ]
 
 TOMTOM_KEY = os.getenv("TOMTOM_API_KEY")
