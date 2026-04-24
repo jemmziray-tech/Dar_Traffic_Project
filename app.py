@@ -4,14 +4,25 @@ from firebase_admin import credentials, firestore
 import pandas as pd
 from datetime import datetime
 import pytz
+import json
 
 # --- 1. Setup Page Config ---
 st.set_page_config(page_title="Dar Traffic Live", layout="wide", page_icon="🚦")
 
-# --- 2. Connect to Firebase (Stable Multi-Page Logic) ---
+# --- 2. Connect to Firebase (Cloud & Local Compatible) ---
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase-key.json")
-    firebase_admin.initialize_app(cred)
+    try:
+        # Check if we are running on Streamlit Cloud (using secrets)
+        if "firebase" in st.secrets:
+            key_dict = json.loads(st.secrets["firebase"]["key_data"])
+            cred = credentials.Certificate(key_dict)
+        else:
+            # Running locally
+            cred = credentials.Certificate("firebase-key.json")
+        firebase_admin.initialize_app(cred)
+    except Exception as e:
+        st.error(f"Failed to connect to Firebase: {e}")
+
 db = firestore.client()
 
 
@@ -32,12 +43,10 @@ df_raw = get_live_data()
 # --- 5. SIDEBAR: Control Center ---
 st.sidebar.header("🕹️ Control Center")
 
-# Local Tanzania Time
 tz = pytz.timezone("Africa/Dar_es_Salaam")
 now = datetime.now(tz)
 st.sidebar.markdown(f"### 🕒 {now.strftime('%I:%M %p')}")
 
-# Peak Hour Logic
 hour = now.hour
 if 7 <= hour <= 9:
     st.sidebar.warning("⚡ Morning Peak")
@@ -48,7 +57,6 @@ else:
 
 st.sidebar.markdown("---")
 
-# Status Filtering
 if not df_raw.empty:
     status_filter = st.sidebar.multiselect(
         "Filter Roads by Status",
@@ -59,7 +67,6 @@ if not df_raw.empty:
 else:
     df = df_raw
 
-# Export Data Button
 if not df.empty:
     csv = df.to_csv(index=False).encode("utf-8")
     st.sidebar.download_button(
@@ -73,7 +80,6 @@ st.title("🚦 Dar es Salaam Smart City Traffic")
 st.markdown("_Real-time mobility intelligence platform_")
 
 if not df.empty:
-    # --- HERO SECTION ---
     st.markdown("### 🌆 City-Wide Overview")
     c1, c2, c3 = st.columns(3)
 
@@ -93,21 +99,19 @@ if not df.empty:
     with c3:
         st.metric("Top Bottleneck", bottleneck_row["name"])
 
-    # --- ADVANCED INTELLIGENCE SECTION ---
     with st.expander("🔬 Advanced System Intelligence", expanded=True):
         ai_col1, ai_col2 = st.columns([2, 1])
-
         with ai_col1:
             if total_delay > 60:
                 st.error(
-                    f"🔴 **Significant Gridlock:** Total city delay is {total_delay} minutes. High congestion detected at **{bottleneck_row['name']}**."
+                    f"🔴 **Significant Gridlock:** Total city delay is {total_delay} minutes. High congestion at **{bottleneck_row['name']}**."
                 )
             elif (
                 "Rain" in df_raw["weather"].iloc[0]
                 or "Drizzle" in df_raw["weather"].iloc[0]
             ):
                 st.warning(
-                    "⚠️ **Weather Advisory:** Precipitation detected. Expect traffic flow efficiency to drop."
+                    "⚠️ **Weather Advisory:** Precipitation detected. Traffic flow efficiency expected to drop."
                 )
             else:
                 st.success(
@@ -121,12 +125,10 @@ if not df.empty:
 
     st.markdown("---")
 
-    # --- GRID LAYOUT ---
     num_cols = 3
     for i in range(0, len(df), num_cols):
         chunk = df.iloc[i : i + num_cols]
         cols = st.columns(num_cols)
-
         for index, row in chunk.reset_index().iterrows():
             with cols[index]:
                 status_emoji = (

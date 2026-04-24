@@ -3,14 +3,22 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 import plotly.express as px
+import json
 
 # --- 1. Setup Page Config ---
 st.set_page_config(page_title="Traffic Trends", layout="wide", page_icon="📈")
 
-# --- 2. Connect to Firebase (Stable Multi-Page Logic) ---
+# --- 2. Connect to Firebase (Cloud & Local Compatible) ---
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase-key.json")
-    firebase_admin.initialize_app(cred)
+    try:
+        if "firebase" in st.secrets:
+            key_dict = json.loads(st.secrets["firebase"]["key_data"])
+            cred = credentials.Certificate(key_dict)
+        else:
+            cred = credentials.Certificate("firebase-key.json")
+        firebase_admin.initialize_app(cred)
+    except Exception as e:
+        st.error(f"Failed to connect: {e}")
 db = firestore.client()
 
 
@@ -33,20 +41,16 @@ def get_historical_data(road_id):
 
 # --- 4. Main UI ---
 st.title("📈 Historical Traffic Intelligence")
-st.markdown("Analyze long-term patterns and weather correlations.")
-
-# Sidebar for road selection
 st.sidebar.header("Analysis Filters")
+
 roads = get_roads_list()
 selected_road = st.sidebar.selectbox("Choose a road to analyze", roads)
 
 if selected_road:
     hist_df = get_historical_data(selected_road)
-
     if not hist_df.empty:
         hist_df["timestamp"] = pd.to_datetime(hist_df["timestamp"])
 
-        # --- ROW 1: Trend Area Chart ---
         st.subheader(f"Delay History: {selected_road}")
         fig = px.area(
             hist_df,
@@ -58,9 +62,7 @@ if selected_road:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- ROW 2: Two Columns ---
         col1, col2 = st.columns(2)
-
         with col1:
             st.subheader("Speed vs Weather")
             fig_speed = px.scatter(
@@ -69,7 +71,6 @@ if selected_road:
                 y="speed_kmh",
                 color="weather",
                 size="delay_mins",
-                title="Velocity Correlation",
                 template="plotly_dark",
             )
             st.plotly_chart(fig_speed, use_container_width=True)
@@ -79,7 +80,6 @@ if selected_road:
             fig_pie = px.pie(
                 hist_df,
                 names="status",
-                title="Frequency of Jams",
                 color_discrete_map={
                     "Smooth": "#28a745",
                     "Moderate": "#ffc107",
@@ -88,6 +88,4 @@ if selected_road:
             )
             st.plotly_chart(fig_pie, use_container_width=True)
     else:
-        st.info(
-            f"Collecting data for {selected_road}... Check back after the next scheduled run!"
-        )
+        st.info("Collecting data... check back after the next scheduled run!")
