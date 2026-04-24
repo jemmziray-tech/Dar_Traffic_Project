@@ -3,34 +3,35 @@ import csv
 import os
 from datetime import datetime
 
-# Configuration
+# Configuration: MICRO-SEGMENTS
+# We target 1-2km bottleneck zones so delays don't get "averaged out"
 ROADS = [
     {
-        "name": "Morogoro_Rd",
-        "start": "-6.7978,39.2201",
-        "end": "-6.8156,39.2863",
-        "dist": 9.2,
+        "name": "Morogoro_Rd_Ubungo_Bottleneck",
+        "start": "-6.7978,39.2201",  # Just before Ubungo Interchange
+        "end": "-6.8040,39.2300",  # Just past the interchange
+        "dist": 1.8,  # Distance shortened to 1.8km
         "file": "dar_morogoro_rd_traffic.csv",
     },
     {
-        "name": "Bagamoyo_Rd",
-        "start": "-6.6734,39.2135",
-        "end": "-6.7845,39.2631",
-        "dist": 13.5,
+        "name": "Bagamoyo_Rd_Mwenge_Bottleneck",
+        "start": "-6.7744,39.2431",  # Just before Mlimani City turnoff
+        "end": "-6.7631,39.2489",  # Just past Mwenge bus stand
+        "dist": 1.5,  # Distance shortened to 1.5km
         "file": "dar_bagamoyo_rd_traffic.csv",
     },
     {
-        "name": "Ali_Hassan_Mwinyi_Rd",
-        "start": "-6.7720,39.2590",
-        "end": "-6.8005,39.2818",
-        "dist": 4.5,
+        "name": "Ali_Hassan_Mwinyi_Selander",
+        "start": "-6.7950,39.2750",  # Approaching Selander Bridge
+        "end": "-6.8050,39.2850",  # Past the bridge into city center
+        "dist": 1.4,  # Distance shortened to 1.4km
         "file": "dar_ali_hassan_mwinyi_traffic.csv",
     },
     {
         "name": "Msimbazi_St_Kariakoo",
-        "start": "-6.8164,39.2730",
-        "end": "-6.8248,39.2785",
-        "dist": 1.5,
+        "start": "-6.8164,39.2730",  # Kariakoo entry
+        "end": "-6.8248,39.2785",  # Kariakoo exit
+        "dist": 1.5,  # Your original distance was perfect here!
         "file": "dar_msimbazi_kariakoo_traffic.csv",
     },
 ]
@@ -53,8 +54,8 @@ def get_weather():
 
 
 def get_traffic_data(road, weather):
-    # Added &traffic=true and &departAt=now to force real-time data
-    url = f"https://api.tomtom.com/routing/1/calculateRoute/{road['start']}:{road['end']}/json?key={TOMTOM_KEY}&traffic=true&departAt=now"
+    # Added routeType=fastest and travelMode=car for higher accuracy probe data
+    url = f"https://api.tomtom.com/routing/1/calculateRoute/{road['start']}:{road['end']}/json?key={TOMTOM_KEY}&traffic=true&departAt=now&routeType=fastest&travelMode=car"
 
     try:
         data = requests.get(url).json()
@@ -66,16 +67,19 @@ def get_traffic_data(road, weather):
         delay_m = summary["trafficDelayInSeconds"] // 60
 
         # 'Normal' is the time it SHOULD take if there was zero traffic
-        # TomTom calls this 'noTrafficTravelTimeInSeconds' in some versions,
-        # but 'live - delay' is a solid way to calculate it here.
         norm_m = live_m - delay_m
 
-        speed = round(road["dist"] / (live_m / 60), 1)
+        # Calculate speed. Prevent division by zero if live_m is incredibly short.
+        if live_m > 0:
+            speed = round(road["dist"] / (live_m / 60), 1)
+        else:
+            speed = 0.0
 
-        # Enhanced status logic
+        # Enhanced status logic (Tuned for micro-segments)
+        # A 5-minute delay on a 1km road is massive!
         if delay_m == 0:
             status = "Smooth"
-        elif delay_m <= 7:
+        elif delay_m <= 3:
             status = "Moderate"
         else:
             status = "Heavy Jam"
@@ -118,6 +122,13 @@ def save_to_csv(fn, ts, norm, live, dly, spd, stat, wthr):
 
 
 if __name__ == "__main__":
-    current_weather = get_weather()
-    for r in ROADS:
-        get_traffic_data(r, current_weather)
+    # Safety check so the script doesn't crash if the API key isn't set
+    if not TOMTOM_KEY:
+        print("⚠️ ERROR: TOMTOM_API_KEY environment variable is not set!")
+        print(
+            "If you are running this locally, hardcode your key temporarily for testing."
+        )
+    else:
+        current_weather = get_weather()
+        for r in ROADS:
+            get_traffic_data(r, current_weather)
