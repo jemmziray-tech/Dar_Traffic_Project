@@ -2,3 +2,7 @@ requests
 googlemaps
 firebase-admin
 python-dotenv
+streamlit
+pandas
+plotly
+pytz
