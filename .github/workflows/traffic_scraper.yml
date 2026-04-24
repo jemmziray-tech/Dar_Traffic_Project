@@ -24,7 +24,7 @@ jobs:
       - name: Run Scraper
         env:
           FIREBASE_KEY_DATA: ${{ secrets.FIREBASE_KEY_JSON }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           echo "$FIREBASE_KEY_DATA" > firebase-key.json
           python scrape_traffic.py
