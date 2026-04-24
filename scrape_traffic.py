@@ -1,134 +1,165 @@
+import googlemaps
+import firebase_admin
+from firebase_admin import credentials, firestore
 import requests
-import csv
 import os
 from datetime import datetime
+from dotenv import load_dotenv
 
-# Configuration: MICRO-SEGMENTS
-# We target 1-2km bottleneck zones so delays don't get "averaged out"
+load_dotenv()
+
+# ---------------------------------------------------------
+# 1. CLOUD INITIALIZATION
+# ---------------------------------------------------------
+# Connect to Firebase using your secret JSON key
+cred = credentials.Certificate("firebase-key.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+# Connect to Google Maps
+GOOGLE_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
+
+# ---------------------------------------------------------
+# 2. BOTTLENECK CONFIGURATION
+# ---------------------------------------------------------
 ROADS = [
     {
-        "name": "Morogoro_Rd_Ubungo_Bottleneck",
-        "start": "-6.7978,39.2201",  # Just before Ubungo Interchange
-        "end": "-6.8040,39.2300",  # Just past the interchange
-        "dist": 1.8,  # Distance shortened to 1.8km
-        "file": "dar_morogoro_rd_traffic.csv",
+        "id": "ubungo",
+        "name": "Morogoro Rd (Ubungo)",
+        "start": "-6.7978,39.2201",
+        "end": "-6.8040,39.2300",
+        "dist": 1.8,
     },
     {
-        "name": "Bagamoyo_Rd_Mwenge_Bottleneck",
-        "start": "-6.7744,39.2431",  # Just before Mlimani City turnoff
-        "end": "-6.7631,39.2489",  # Just past Mwenge bus stand
-        "dist": 1.5,  # Distance shortened to 1.5km
-        "file": "dar_bagamoyo_rd_traffic.csv",
+        "id": "mwenge",
+        "name": "Bagamoyo Rd (Mwenge)",
+        "start": "-6.7744,39.2431",
+        "end": "-6.7631,39.2489",
+        "dist": 1.5,
     },
     {
-        "name": "Ali_Hassan_Mwinyi_Selander",
-        "start": "-6.7950,39.2750",  # Approaching Selander Bridge
-        "end": "-6.8050,39.2850",  # Past the bridge into city center
-        "dist": 1.4,  # Distance shortened to 1.4km
-        "file": "dar_ali_hassan_mwinyi_traffic.csv",
+        "id": "selander",
+        "name": "Ali Hassan Mwinyi",
+        "start": "-6.7950,39.2750",
+        "end": "-6.8050,39.2850",
+        "dist": 1.4,
     },
     {
-        "name": "Msimbazi_St_Kariakoo",
-        "start": "-6.8164,39.2730",  # Kariakoo entry
-        "end": "-6.8248,39.2785",  # Kariakoo exit
-        "dist": 1.5,  # Your original distance was perfect here!
-        "file": "dar_msimbazi_kariakoo_traffic.csv",
+        "id": "tazara",
+        "name": "Nyerere Rd (Tazara)",
+        "start": "-6.8288,39.2600",
+        "end": "-6.8400,39.2480",
+        "dist": 1.7,
+    },
+    {
+        "id": "mandela_buguruni",
+        "name": "Mandela Rd (Port Link)",
+        "start": "-6.8285,39.2435",
+        "end": "-6.8335,39.2620",
+        "dist": 2.5,
+    },
+    {
+        "id": "kilwa_mbagala",
+        "name": "Kilwa Rd (Mbagala)",
+        "start": "-6.9050,39.2700",
+        "end": "-6.8750,39.2800",
+        "dist": 3.5,
+    },
+    {
+        "id": "old_bagamoyo",
+        "name": "Old Bagamoyo Rd (Victoria)",
+        "start": "-6.7720,39.2550",
+        "end": "-6.7820,39.2650",
+        "dist": 1.5,
     },
 ]
 
-TOMTOM_KEY = os.getenv("TOMTOM_API_KEY")
 
-
+# ---------------------------------------------------------
+# 3. WEATHER ENGINE
+# ---------------------------------------------------------
 def get_weather():
-    # Ubungo coordinates for a general Dar weather snapshot
     url = "https://api.open-meteo.com/v1/forecast?latitude=-6.7978&longitude=39.2201&current_weather=true"
     try:
         data = requests.get(url).json()
         temp = data["current_weather"]["temperature"]
-        # Weather codes: 0=Clear, 1-3=Partly Cloudy, 51-67=Rain, 80-82=Showers
         code = data["current_weather"]["weathercode"]
         condition = "Clear" if code <= 3 else "Rainy" if code >= 51 else "Cloudy"
         return f"{temp}°C, {condition}"
     except:
-        return "Unknown"
+        return "Unknown Weather"
 
 
-def get_traffic_data(road, weather):
-    # Added routeType=fastest and travelMode=car for higher accuracy probe data
-    url = f"https://api.tomtom.com/routing/1/calculateRoute/{road['start']}:{road['end']}/json?key={TOMTOM_KEY}&traffic=true&departAt=now&routeType=fastest&travelMode=car"
-
+# ---------------------------------------------------------
+# 4. TRAFFIC ENGINE & FIREBASE SYNC
+# ---------------------------------------------------------
+def update_smart_city(road, weather):
     try:
-        data = requests.get(url).json()
-        summary = data["routes"][0]["summary"]
-
-        # total travel time including current traffic
-        live_m = summary["travelTimeInSeconds"] // 60
-        # actual delay compared to a clear road
-        delay_m = summary["trafficDelayInSeconds"] // 60
-
-        # 'Normal' is the time it SHOULD take if there was zero traffic
-        norm_m = live_m - delay_m
-
-        # Calculate speed. Prevent division by zero if live_m is incredibly short.
-        if live_m > 0:
-            speed = round(road["dist"] / (live_m / 60), 1)
-        else:
-            speed = 0.0
-
-        # Enhanced status logic (Tuned for micro-segments)
-        # A 5-minute delay on a 1km road is massive!
-        if delay_m == 0:
-            status = "Smooth"
-        elif delay_m <= 3:
-            status = "Moderate"
-        else:
-            status = "Heavy Jam"
-
-        save_to_csv(
-            road["file"],
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            norm_m,
-            live_m,
-            delay_m,
-            speed,
-            status,
-            weather,
+        # Ask Google for Live Data
+        result = gmaps.distance_matrix(
+            origins=road["start"],
+            destinations=road["end"],
+            mode="driving",
+            departure_time="now",
+            traffic_model="best_guess",
         )
-        print(
-            f"✅ {road['name']} updated: {status} ({delay_m}m delay). Speed: {speed}kmh"
+
+        element = result["rows"][0]["elements"][0]
+        if element["status"] != "OK":
+            print(f"❌ Google API Error for {road['name']}: {element['status']}")
+            return
+
+        # Calculate Math
+        live_m = element["duration_in_traffic"]["value"] // 60
+        norm_m = element["duration"]["value"] // 60
+        delay_m = max(0, live_m - norm_m)
+        speed = round(road["dist"] / (live_m / 60), 1) if live_m > 0 else 0.0
+
+        # Determine Status
+        status = (
+            "Smooth" if delay_m <= 3 else "Moderate" if delay_m <= 7 else "Heavy Jam"
         )
+
+        # Build the Data Payload
+        traffic_data = {
+            "name": road["name"],
+            "normal_mins": norm_m,
+            "live_mins": live_m,
+            "delay_mins": delay_m,
+            "speed_kmh": speed,
+            "status": status,
+            "weather": weather,
+            # SERVER_TIMESTAMP is crucial: it uses Google's perfect internal clock
+            "timestamp": firestore.SERVER_TIMESTAMP,
+        }
+
+        # --- HOT / COLD STORAGE STRATEGY ---
+
+        # HOT STORAGE: Overwrite the live document (For your App/Dashboard)
+        db.collection("live_traffic").document(road["id"]).set(traffic_data)
+
+        # COLD STORAGE: Add a new log for Machine Learning History
+        db.collection("traffic_history").add(traffic_data)
+
+        print(f"✅ Firebase Synced | {road['name']}: {status} (+{delay_m}m)")
 
     except Exception as e:
-        print(f"❌ Error on {road['name']}: {e}")
+        print(f"❌ Error syncing {road['name']}: {e}")
 
 
-def save_to_csv(fn, ts, norm, live, dly, spd, stat, wthr):
-    exists = os.path.isfile(fn)
-    with open(fn, "a", newline="") as f:
-        writer = csv.writer(f)
-        if not exists:
-            writer.writerow(
-                [
-                    "Timestamp",
-                    "Normal_Mins",
-                    "Live_Mins",
-                    "Delay_Mins",
-                    "Avg_Speed_kmh",
-                    "Status",
-                    "Weather",
-                ]
-            )
-        writer.writerow([ts, norm, live, dly, spd, stat, wthr])
-
-
+# ---------------------------------------------------------
+# 5. MAIN EXECUTION
+# ---------------------------------------------------------
 if __name__ == "__main__":
-    # Safety check so the script doesn't crash if the API key isn't set
-    if not TOMTOM_KEY:
-        print("⚠️ ERROR: TOMTOM_API_KEY environment variable is not set!")
-        print(
-            "If you are running this locally, hardcode your key temporarily for testing."
-        )
+    print(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Booting Smart City Engine..."
+    )
+
+    if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE":
+        print("⚠️ ERROR: You forgot to paste your Google API Key on line 17!")
     else:
         current_weather = get_weather()
         for r in ROADS:
-            get_traffic_data(r, current_weather)
+            update_smart_city(r, current_weather)
+        print("🎉 Sync Complete!")
