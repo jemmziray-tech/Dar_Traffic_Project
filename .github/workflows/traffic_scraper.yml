@@ -1,4 +1,5 @@
 name: Traffic Scraper Automation
+
 on:
   schedule:
     - cron: '*/15 * * * *' # This runs every 15 minutes
@@ -22,7 +23,6 @@ jobs:
 
       - name: Run Scraper
         env:
-          # This creates a temporary file from your secret so the script can read it
           FIREBASE_KEY_DATA: ${{ secrets.FIREBASE_KEY_JSON }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
