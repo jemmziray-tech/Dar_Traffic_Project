@@ -2,8 +2,12 @@ name: Traffic Scraper Automation
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # This runs every 15 minutes
-  workflow_dispatch:      # This lets you run it manually for testing
+    # Runs every 15 minutes, but ONLY between 02:00 UTC and 20:00 UTC.
+    # Note: Tanzania is UTC+3. 
+    # 02:00 UTC = 5:00 AM EAT (Tanzania Time)
+    # 20:00 UTC = 11:00 PM EAT (Tanzania Time)
+    - cron: '*/15 2-20 * * *' 
+  workflow_dispatch:
 
 jobs:
   build:
