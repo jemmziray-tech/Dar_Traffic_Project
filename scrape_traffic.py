@@ -123,6 +123,7 @@ def update_smart_city(road, weather):
 
         # Build the Data Payload
         traffic_data = {
+            "road_id": road_id,
             "name": road["name"],
             "normal_mins": norm_m,
             "live_mins": live_m,
