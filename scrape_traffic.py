@@ -1,22 +1,26 @@
+import os
+import logging
+from datetime import datetime
+import requests
 import googlemaps
 import firebase_admin
 from firebase_admin import credentials, firestore
-import requests
-import os
-from datetime import datetime
 from dotenv import load_dotenv
+
+# --- Configure Enterprise Logging ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 load_dotenv()
 
 # ---------------------------------------------------------
 # 1. CLOUD INITIALIZATION
 # ---------------------------------------------------------
-# Connect to Firebase using your secret JSON key
 cred = credentials.Certificate("firebase-key.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Connect to Google Maps
 GOOGLE_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
 
@@ -87,7 +91,8 @@ def get_weather():
         code = data["current_weather"]["weathercode"]
         condition = "Clear" if code <= 3 else "Rainy" if code >= 51 else "Cloudy"
         return f"{temp}°C, {condition}"
-    except:
+    except Exception as e:
+        logging.error(f"Weather API Error: {e}")
         return "Unknown Weather"
 
 
@@ -96,7 +101,6 @@ def get_weather():
 # ---------------------------------------------------------
 def update_smart_city(road, weather):
     try:
-        # Ask Google for Live Data
         result = gmaps.distance_matrix(
             origins=road["start"],
             destinations=road["end"],
@@ -107,23 +111,20 @@ def update_smart_city(road, weather):
 
         element = result["rows"][0]["elements"][0]
         if element["status"] != "OK":
-            print(f"❌ Google API Error for {road['name']}: {element['status']}")
+            logging.error(f"Google API Error for {road['name']}: {element['status']}")
             return
 
-        # Calculate Math
         live_m = element["duration_in_traffic"]["value"] // 60
         norm_m = element["duration"]["value"] // 60
         delay_m = max(0, live_m - norm_m)
         speed = round(road["dist"] / (live_m / 60), 1) if live_m > 0 else 0.0
 
-        # Determine Status
         status = (
             "Smooth" if delay_m <= 3 else "Moderate" if delay_m <= 7 else "Heavy Jam"
         )
 
-        # Build the Data Payload
         traffic_data = {
-            "road_id": road_id,
+            "road_id": road["id"],  # Fixed NameError bug here!
             "name": road["name"],
             "normal_mins": norm_m,
             "live_mins": live_m,
@@ -131,36 +132,30 @@ def update_smart_city(road, weather):
             "speed_kmh": speed,
             "status": status,
             "weather": weather,
-            # SERVER_TIMESTAMP is crucial: it uses Google's perfect internal clock
             "timestamp": firestore.SERVER_TIMESTAMP,
         }
 
-        # --- HOT / COLD STORAGE STRATEGY ---
-
-        # HOT STORAGE: Overwrite the live document (For your App/Dashboard)
+        # HOT STORAGE
         db.collection("live_traffic").document(road["id"]).set(traffic_data)
-
-        # COLD STORAGE: Add a new log for Machine Learning History
+        # COLD STORAGE
         db.collection("traffic_history").add(traffic_data)
 
-        print(f"✅ Firebase Synced | {road['name']}: {status} (+{delay_m}m)")
+        logging.info(f"Firebase Synced | {road['name']}: {status} (+{delay_m}m)")
 
     except Exception as e:
-        print(f"❌ Error syncing {road['name']}: {e}")
+        logging.error(f"Error syncing {road['name']}: {e}")
 
 
 # ---------------------------------------------------------
 # 5. MAIN EXECUTION
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Booting Smart City Engine..."
-    )
+    logging.info("Booting Smart City Engine...")
 
-    if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE":
-        print("⚠️ ERROR: You forgot to paste your Google API Key on line 17!")
+    if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not GOOGLE_API_KEY:
+        logging.error("You forgot to configure your Google API Key in the .env file!")
     else:
         current_weather = get_weather()
         for r in ROADS:
             update_smart_city(r, current_weather)
-        print("🎉 Sync Complete!")
+        logging.info("Sync Complete!")

@@ -1,33 +1,41 @@
+import os
+import json
+import pandas as pd
+import plotly.express as px
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-import pandas as pd
-import plotly.express as px
-import json
 
 # --- 1. Setup Page Config ---
 st.set_page_config(page_title="Traffic Trends", layout="wide", page_icon="📈")
 
-# --- 2. Connect to Firebase (Cloud & Local Compatible) ---
+# --- 2. Connect to Firebase ---
 if not firebase_admin._apps:
     try:
-        if "firebase" in st.secrets:
+        if os.path.exists("firebase-key.json"):
+            cred = credentials.Certificate("firebase-key.json")
+        elif "firebase" in st.secrets:
             key_dict = json.loads(st.secrets["firebase"]["key_data"])
             cred = credentials.Certificate(key_dict)
         else:
-            cred = credentials.Certificate("firebase-key.json")
+            st.error("No valid Firebase credentials found.")
+            st.stop()
         firebase_admin.initialize_app(cred)
     except Exception as e:
         st.error(f"Failed to connect: {e}")
+        st.stop()
+
 db = firestore.client()
 
 
 # --- 3. Functions ---
+@st.cache_data(ttl=300)  # Caches the road list for 5 minutes
 def get_roads_list():
     docs = db.collection("live_traffic").stream()
     return [doc.id for doc in docs]
 
 
+@st.cache_data(ttl=300)  # Caches the heavy history payload for 5 minutes
 def get_historical_data(road_id):
     stats_ref = db.collection("traffic_history")
     query = (
@@ -49,7 +57,13 @@ selected_road = st.sidebar.selectbox("Choose a road to analyze", roads)
 if selected_road:
     hist_df = get_historical_data(selected_road)
     if not hist_df.empty:
+        # Convert timestamp to a Datetime object
         hist_df["timestamp"] = pd.to_datetime(hist_df["timestamp"])
+
+        # TIMEZONE FIX: Convert from UTC to East Africa Time (Tanzania)
+        hist_df["timestamp"] = hist_df["timestamp"].dt.tz_convert(
+            "Africa/Dar_es_Salaam"
+        )
 
         st.subheader(f"Delay History: {selected_road}")
         fig = px.area(
