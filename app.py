@@ -45,7 +45,7 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- 3. DAR ES SALAAM COORDINATES ---
+# --- 3. DAR ES SALAAM COORDINATES (Expanded Grid) ---
 ROAD_COORDS = {
     "kilwa_mbagala": {"lat": -6.892, "lon": 39.269},
     "mandela_buguruni": {"lat": -6.834, "lon": 39.248},
@@ -82,7 +82,7 @@ def get_live_data():
 
 df_raw = get_live_data()
 
-# --- 5. SIDEBAR: Control Center ---
+# --- 5. SIDEBAR: Control Center & Provenance ---
 st.sidebar.title(":material/tune: COMMAND CENTER")
 tz = pytz.timezone("Africa/Dar_es_Salaam")
 st.sidebar.info(
@@ -103,6 +103,16 @@ if not df.empty:
         data=csv,
         file_name="dar_traffic_live.csv",
     )
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📡 Data Provenance")
+st.sidebar.caption(
+    "**Traffic Data:** Google Maps Distance Matrix API (Live best_guess model)"
+)
+st.sidebar.caption("**Weather Data:** Open-Meteo Global API")
+st.sidebar.caption("**Infrastructure:** Firebase & GitHub Actions")
+
+st.sidebar.markdown("---")
 st.sidebar.caption("Built by John Mziray | Data Engineering Portfolio")
 
 # --- 6. MAIN DASHBOARD ---
@@ -110,15 +120,29 @@ st.title("DAR ES SALAAM TRAFFIC INTELLIGENCE")
 st.markdown("---")
 
 if not df.empty:
-    c1, c2, c3 = st.columns(3)
+    # --- ROW 1: City Health Hero (Now with 4 columns for Last Sync) ---
+    c1, c2, c3, c4 = st.columns(4)
     avg_speed = df_raw["speed_kmh"].mean()
     total_delay = df_raw["delay_mins"].sum()
     efficiency = 100 - min((total_delay / 150) * 100, 100)
 
+    # Safely get the latest sync time from the dataframe
+    if "timestamp" in df_raw.columns:
+        latest_time = pd.to_datetime(df_raw["timestamp"].max()).tz_convert(
+            "Africa/Dar_es_Salaam"
+        )
+        time_str = latest_time.strftime("%I:%M %p")
+    else:
+        time_str = "Live"
+
     c1.metric("NETWORK EFFICIENCY", f"{efficiency:.1f}%")
     c2.metric("AVG VELOCITY", f"{avg_speed:.1f} km/h")
     c3.metric("TOTAL DELAY", f"{total_delay} MIN")
+    c4.metric(
+        "LAST SYNC", time_str, delta="Verified by Google API", delta_color="normal"
+    )
 
+    # --- ADVANCED INTELLIGENCE SECTION ---
     with st.expander(":material/memory: Advanced System Intelligence", expanded=True):
         ai_col1, ai_col2 = st.columns([2, 1])
         with ai_col1:
@@ -146,6 +170,8 @@ if not df.empty:
             st.progress(efficiency / 100)
 
     st.markdown("---")
+
+    # --- UI LAYOUT: TABS ---
     tab1, tab2 = st.tabs(
         [":material/map: Live Map View", ":material/analytics: Detailed Node Analysis"]
     )
@@ -155,13 +181,15 @@ if not df.empty:
             "html": "<b>{name}</b><br/>Speed: {speed_kmh} km/h<br/>Status: {status}",
             "style": {"backgroundColor": "black", "color": "white"},
         }
-        view_state = pdk.ViewState(latitude=-6.81, longitude=39.25, zoom=11, pitch=45)
+        view_state = pdk.ViewState(
+            latitude=-6.81, longitude=39.25, zoom=12, pitch=45
+        )  # Zoom slightly adjusted for wider grid
         layer = pdk.Layer(
             "ScatterplotLayer",
             df,
             get_position=["lon", "lat"],
             get_color="color",
-            get_radius=400,
+            get_radius=350,
             pickable=True,
         )
         st.pydeck_chart(
@@ -205,5 +233,20 @@ if not df.empty:
                         st.caption(
                             f":material/cloud: {row['weather'].upper()} | :material/router: {row['id']}"
                         )
+
+    # --- FOOTER: METHODOLOGY ---
+    st.markdown("---")
+    with st.expander("🔬 How does this dashboard work?", expanded=False):
+        st.markdown(
+            """
+        **The Architecture of Trust:**
+        1. **Autonomous Ingestion:** Every 15 minutes, a headless GitHub Actions server wakes up and pings the **Google Maps Enterprise API** and **Open-Meteo API**.
+        2. **Algorithm:** It requests the current driving time for specific road coordinates and compares it against the "free-flowing" historical average to calculate the exact `delay_mins`.
+        3. **Cloud Storage:** The processed payload is injected into a NoSQL **Google Cloud Firestore** database.
+        4. **Live Rendering:** This Streamlit app listens to the database and re-renders the 3D Pydeck map and analytical KPIs instantly.
+        
+        *This is a live Digital Twin of Dar es Salaam's traffic arteries.* [View the Open Source Pipeline on GitHub](https://github.com/jemmziray-tech/Dar_Traffic_Project)
+        """
+        )
 else:
     st.info("No data available based on current filters.", icon=":material/info:")
