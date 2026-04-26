@@ -79,12 +79,22 @@ if selected_road:
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Speed vs Weather")
+            
+            # --- THE FIX: Extract just the condition (Clear, Rainy, Cloudy) for the colors ---
+            hist_df['condition_only'] = hist_df['weather'].apply(lambda x: x.split(', ')[1] if ', ' in x else x)
+            
             fig_speed = px.scatter(
                 hist_df,
                 x="timestamp",
                 y="speed_kmh",
-                color="weather",
+                color="condition_only",  # Use the clean categories for colors
                 size="delay_mins",
+                hover_name="weather",    # Keep the exact temp in the hover tooltip!
+                color_discrete_map={
+                    "Clear": "#00d2ff",   # Bright blue for clear
+                    "Cloudy": "#9e9e9e",  # Grey for clouds
+                    "Rainy": "#0047b3"    # Deep blue/purple for rain
+                },
                 template="plotly_dark",
             )
             st.plotly_chart(fig_speed, use_container_width=True)
