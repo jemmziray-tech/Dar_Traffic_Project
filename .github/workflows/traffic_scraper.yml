@@ -2,11 +2,11 @@ name: Traffic Scraper Automation
 
 on:
   schedule:
-    # Runs every 15 minutes, but ONLY between 02:00 UTC and 20:00 UTC.
-    # Note: Tanzania is UTC+3. 
+    # Runs 4 times an hour on "off-minutes" (7, 22, 37, 52) to bypass GitHub Actions server queues.
+    # Runs ONLY between 02:00 UTC and 20:00 UTC.
     # 02:00 UTC = 5:00 AM EAT (Tanzania Time)
     # 20:00 UTC = 11:00 PM EAT (Tanzania Time)
-    - cron: '*/15 2-20 * * *' 
+    - cron: '7,22,37,52 2-20 * * *' 
   workflow_dispatch:
 
 jobs:
@@ -14,12 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip' # Pro-tip: Caches dependencies to make the bot run even faster!
 
       - name: Install dependencies
         run: |
