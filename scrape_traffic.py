@@ -77,6 +77,27 @@ ROADS = [
         "end": "-6.7820,39.2650",
         "dist": 1.5,
     },
+    {
+        "id": "sam_nujoma",
+        "name": "Sam Nujoma Rd (Mwenge-Ubungo)",
+        "start": "-6.7755,39.2435", # Mwenge side
+        "end": "-6.7975,39.2205",   # Ubungo side
+        "dist": 4.2,
+    },
+    {
+        "id": "uhuru_street",
+        "name": "Uhuru Street (Ilala-Town)",
+        "start": "-6.8220,39.2550", # Ilala Boma
+        "end": "-6.8155,39.2820",   # City Centre / Clock Tower
+        "dist": 3.2,
+    },
+    {
+        "id": "kariakoo",
+        "name": "Kariakoo Market Grid",
+        "start": "-6.8115,39.2725", # Msimbazi / Fire
+        "end": "-6.8210,39.2750",   # Kariakoo Roundabout
+        "dist": 1.1,
+    },
 ]
 
 

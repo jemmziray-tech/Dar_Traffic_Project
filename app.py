@@ -54,6 +54,9 @@ ROAD_COORDS = {
     "selander": {"lat": -6.801, "lon": 39.288},
     "tazara": {"lat": -6.835, "lon": 39.236},
     "ubungo": {"lat": -6.797, "lon": 39.218},
+    "sam_nujoma": {"lat": -6.7865, "lon": 39.2320},
+    "uhuru_street": {"lat": -6.8187, "lon": 39.2685},
+    "kariakoo": {"lat": -6.8162, "lon": 39.2737},
 }
 
 
