@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from datetime import datetime
 import pytz
 import pandas as pd
@@ -9,12 +10,17 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # --- 1. Setup Page Config ---
-st.set_page_config(page_title="Dar Traffic Intelligence", layout="wide")
+st.set_page_config(
+    page_title="Dar Traffic Intelligence",
+    layout="wide",
+    page_icon=":material/satellite_alt:",
+)
 
-# --- CUSTOM CSS: PULSING RADAR ANIMATIONS ---
+# --- CUSTOM CSS: PULSING RADAR ANIMATIONS & CLEAN UI ---
 st.markdown(
     """
 <style>
+/* Pulsing status indicators */
 .blob { border-radius: 50%; margin-right: 12px; height: 14px; width: 14px; transform: scale(1); }
 .blob.green { background: rgba(40, 167, 69, 1); animation: pulse-green 2s infinite; }
 @keyframes pulse-green { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); } }
@@ -22,6 +28,9 @@ st.markdown(
 @keyframes pulse-yellow { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); } }
 .blob.red { background: rgba(220, 53, 69, 1); animation: pulse-red 1.2s infinite; }
 @keyframes pulse-red { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.8); } 70% { transform: scale(1.1); box-shadow: 0 0 0 12px rgba(220, 53, 69, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+
+/* Clean up Streamlit's default padding for a dashboard feel */
+.block-container { padding-top: 2rem; padding-bottom: 2rem; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -45,7 +54,7 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- 3. DAR ES SALAAM COORDINATES (Expanded Grid) ---
+# --- 3. DAR ES SALAAM COORDINATES ---
 ROAD_COORDS = {
     "kilwa_mbagala": {"lat": -6.892, "lon": 39.269},
     "mandela_buguruni": {"lat": -6.834, "lon": 39.248},
@@ -70,12 +79,18 @@ def get_live_data():
         row["id"] = doc.id
         coords = ROAD_COORDS.get(doc.id, {"lat": -6.792, "lon": 39.239})
         row["lat"], row["lon"] = coords["lat"], coords["lon"]
+
+        # Assign RGB values for the 3D Pydeck Map
         if row["status"] == "Smooth":
             row["color"] = [40, 167, 69, 200]
         elif row["status"] == "Moderate":
-            row["color"] = [255, 193, 7, 200]
+            row["color"] = [255, 193, 7, 220]
         else:
             row["color"] = [220, 53, 69, 255]
+
+        # Ensure a minimum elevation so even 'Smooth' roads show a tiny blip on the 3D map
+        row["elevation_val"] = max(row["delay_mins"], 0.5)
+
         data.append(row)
     return pd.DataFrame(data)
 
@@ -84,6 +99,16 @@ df_raw = get_live_data()
 
 # --- 5. SIDEBAR: Control Center & Provenance ---
 st.sidebar.title(":material/tune: COMMAND CENTER")
+
+# --- NEW: Live Sync Button ---
+if st.sidebar.button(
+    "Sync Live Telemetry", icon=":material/sync:", use_container_width=True
+):
+    with st.spinner("Pinging satellites and updating database..."):
+        time.sleep(0.8)  # Artificial delay to let the user see the spinner
+        get_live_data.clear()  # Busts the 60-second cache
+        st.rerun()  # Instantly reloads the UI with fresh data
+
 tz = pytz.timezone("Africa/Dar_es_Salaam")
 st.sidebar.info(
     f"Local Time: {datetime.now(tz).strftime('%H:%M')}", icon=":material/schedule:"
@@ -99,13 +124,14 @@ df = df_raw[df_raw["status"].isin(status_filter)] if not df_raw.empty else df_ra
 if not df.empty:
     csv = df.to_csv(index=False).encode("utf-8")
     st.sidebar.download_button(
-        ":material/download: Export Live CSV",
+        label="Export Live CSV",
         data=csv,
         file_name="dar_traffic_live.csv",
+        icon=":material/download:",
     )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📡 Data Provenance")
+st.sidebar.markdown("### :material/database: Data Provenance")
 st.sidebar.caption(
     "**Traffic Data:** Google Maps Distance Matrix API (Live best_guess model)"
 )
@@ -120,7 +146,7 @@ st.title("DAR ES SALAAM TRAFFIC INTELLIGENCE")
 st.markdown("---")
 
 if not df.empty:
-    # --- ROW 1: City Health Hero (Now with 4 columns for Last Sync) ---
+    # --- ROW 1: City Health Hero ---
     c1, c2, c3, c4 = st.columns(4)
     avg_speed = df_raw["speed_kmh"].mean()
     total_delay = df_raw["delay_mins"].sum()
@@ -149,7 +175,7 @@ if not df.empty:
             bottleneck_row = df_raw.loc[df_raw["delay_mins"].idxmax()]
             if total_delay > 60:
                 st.error(
-                    f"**Significant Gridlock:** High congestion at **{bottleneck_row['name']}**.",
+                    f"**Significant Gridlock:** High congestion detected at **{bottleneck_row['name']}**.",
                     icon=":material/gpp_bad:",
                 )
             elif (
@@ -173,31 +199,49 @@ if not df.empty:
 
     # --- UI LAYOUT: TABS ---
     tab1, tab2 = st.tabs(
-        [":material/map: Live Map View", ":material/analytics: Detailed Node Analysis"]
+        [
+            ":material/3d_rotation: 3D Node Map",
+            ":material/analytics: Detailed Node Analysis",
+        ]
     )
 
     with tab1:
+        # --- NEW: 3D ColumnLayer Map ---
         tooltip = {
-            "html": "<b>{name}</b><br/>Speed: {speed_kmh} km/h<br/>Status: {status}",
-            "style": {"backgroundColor": "black", "color": "white"},
+            "html": "<b>{name}</b><br/>Speed: {speed_kmh} km/h<br/>Status: {status}<br/>Delay: {delay_mins} mins",
+            "style": {
+                "backgroundColor": "#1E1E1E",
+                "color": "white",
+                "border": "1px solid #333",
+                "borderRadius": "4px",
+            },
         }
+
+        # Pitched at 45 degrees to show off the 3D elevation
         view_state = pdk.ViewState(
-            latitude=-6.81, longitude=39.25, zoom=12, pitch=45
-        )  # Zoom slightly adjusted for wider grid
+            latitude=-6.81, longitude=39.25, zoom=11.5, pitch=45, bearing=0
+        )
+
+        # Upgraded to ColumnLayer
         layer = pdk.Layer(
-            "ScatterplotLayer",
+            "ColumnLayer",
             df,
             get_position=["lon", "lat"],
-            get_color="color",
-            get_radius=350,
+            get_elevation="elevation_val",
+            elevation_scale=150,  # Multiplier for how tall the blocks get
+            radius=250,  # Thickness of the pillars
+            get_fill_color="color",
+            extruded=True,  # Turns on the 3D rendering
             pickable=True,
+            auto_highlight=True,
         )
+
         st.pydeck_chart(
             pdk.Deck(
                 layers=[layer],
                 initial_view_state=view_state,
                 tooltip=tooltip,
-                map_style="dark",
+                map_style="mapbox://styles/mapbox/dark-v11",
             )
         )
 
@@ -235,18 +279,19 @@ if not df.empty:
                         )
 
     # --- FOOTER: METHODOLOGY ---
-    st.markdown("---")
-    with st.expander("🔬 How does this dashboard work?", expanded=False):
-        st.markdown(
-            """
+    with st.expander(
+        ":material/science: How does this dashboard work?", expanded=False
+    ):
+        st.markdown("""
         **The Architecture of Trust:**
-        1. **Autonomous Ingestion:** Every 15 minutes, a headless GitHub Actions server wakes up and pings the **Google Maps Enterprise API** and **Open-Meteo API**.
-        2. **Algorithm:** It requests the current driving time for specific road coordinates and compares it against the "free-flowing" historical average to calculate the exact `delay_mins`.
-        3. **Cloud Storage:** The processed payload is injected into a NoSQL **Google Cloud Firestore** database.
-        4. **Live Rendering:** This Streamlit app listens to the database and re-renders the 3D Pydeck map and analytical KPIs instantly.
         
+        * :material/memory: **Autonomous Ingestion:** An asynchronous GitHub Actions server continuously monitors and pings the **Google Maps Enterprise API** and **Open-Meteo API** throughout the day to capture dynamic flow states.
+        * :material/account_tree: **Algorithm:** It requests the current driving time for specific road coordinates and compares it against the "free-flowing" historical average to calculate the exact `delay_mins`.
+        * :material/database: **Cloud Storage:** The processed payload is injected into a NoSQL **Google Cloud Firestore** database.
+        * :material/speed: **Live Rendering:** This Streamlit app listens to the database and re-renders the 3D Pydeck map and analytical KPIs instantly.
+        
+        ---
         *This is a live Digital Twin of Dar es Salaam's traffic arteries.* [View the Open Source Pipeline on GitHub](https://github.com/jemmziray-tech/Dar_Traffic_Project)
-        """
-        )
+        """)
 else:
     st.info("No data available based on current filters.", icon=":material/info:")
