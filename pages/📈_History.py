@@ -70,10 +70,10 @@ ROAD_COORDS = {
 
 
 # --- 4. Main UI ---
-st.title("📈 Historical Traffic Intelligence")
+st.title(":material/monitoring: Historical Traffic Intelligence")
 
-# --- 9. NEW: Global City-Wide Map ---
-st.markdown("### 🗺️ Live City-Wide Traffic Map")
+# --- 9. Global City-Wide Map ---
+st.markdown("### :material/map: Live City-Wide Traffic Map")
 
 city_df = get_live_city_data()
 
@@ -86,7 +86,7 @@ if not city_df.empty:
         lambda x: ROAD_COORDS.get(x, {}).get("lon", 39.2736)
     )
 
-    # 2. Clean up the road names for the tooltip (e.g., "sam_nujoma" -> "Sam Nujoma")
+    # 2. Clean up the road names for the tooltip
     city_df["Road Name"] = city_df["road_id"].str.replace("_", " ").str.title()
 
     # 3. Handle base cases where delay is 0 so the dot doesn't disappear completely
@@ -171,7 +171,9 @@ if selected_road:
         pulse_color = "off" if delay_delta == 0 else "inverse"
 
         # 4. Display the Live Pulse Metric
-        st.info("⚡ **Live Pulse Benchmark: Real-Time vs History**")
+        st.info(
+            "**Live Pulse Benchmark: Real-Time vs History**", icon=":material/speed:"
+        )
         st.metric(
             label=f"Current Status: {current_status} (Last updated at {current_time.strftime('%H:%M')})",
             value=f"{current_delay:.1f} Mins",
@@ -204,9 +206,9 @@ if selected_road:
                 hist_df,
                 x="timestamp",
                 y="speed_kmh",
-                color="condition_only",  # Use the clean categories for colors
+                color="condition_only",
                 size="delay_mins",
-                hover_name="weather",  # Keep the exact temp in the hover tooltip!
+                hover_name="weather",
                 color_discrete_map={
                     "Clear": "#00d2ff",  # Bright blue for clear
                     "Cloudy": "#9e9e9e",  # Grey for clouds
@@ -234,15 +236,10 @@ if selected_road:
 
         # Prepare the Data for both Insights and Heatmap
         df_heat = hist_df.copy()
-
-        # Extract the Hour and the Day of the Week
         df_heat["Hour"] = df_heat["timestamp"].dt.hour
         df_heat["Day"] = df_heat["timestamp"].dt.day_name()
-
-        # Filter out the sleeping hours (Keep only 5 AM to 10 PM)
         df_heat = df_heat[(df_heat["Hour"] >= 5) & (df_heat["Hour"] <= 22)]
 
-        # Define the correct calendar order
         days_order = [
             "Monday",
             "Tuesday",
@@ -253,38 +250,32 @@ if selected_road:
             "Sunday",
         ]
 
-        # Group the data: Calculate the average delay
         heatmap_data = (
             df_heat.groupby(["Day", "Hour"])["delay_mins"].mean().reset_index()
         )
 
         # --- AI Traffic Reporter: Automated Insights ---
         if not heatmap_data.empty:
-            # 1. Find the exact row with the highest average delay
             worst_idx = heatmap_data["delay_mins"].idxmax()
             worst_row = heatmap_data.loc[worst_idx]
             worst_day = worst_row["Day"]
             worst_hour_str = f"{int(worst_row['Hour']):02d}:00"
             worst_delay = worst_row["delay_mins"]
 
-            # 2. Find the exact row with the lowest average delay
             best_idx = heatmap_data["delay_mins"].idxmin()
             best_row = heatmap_data.loc[best_idx]
             best_day = best_row["Day"]
             best_hour_str = f"{int(best_row['Hour']):02d}:00"
             best_delay = best_row["delay_mins"]
 
-            # 3. Render the Professional Insight UI
             st.subheader(":material/analytics: Automated Insights")
 
-            # Using st.warning for peak congestion (gives a professional yellow/red tint)
             st.warning(
                 f"**Peak Congestion Detected:** Based on historical aggregates, the most severe traffic typically occurs on "
                 f"**{worst_day}s at {worst_hour_str}**, with an average delay of **{worst_delay:.1f} minutes**.",
                 icon=":material/warning:",
             )
 
-            # Using st.success for smooth transit (gives a professional green tint)
             st.success(
                 f"**Optimal Transit Window:** For the smoothest commute, historical data suggests traveling on "
                 f"**{best_day}s around {best_hour_str}**. Average delays drop to **{best_delay:.1f} minutes**.",
@@ -293,27 +284,19 @@ if selected_road:
             st.markdown("---")
         # --- End of Insights Engine ---
 
-        st.subheader("🗓️ Historical Congestion Heatmap")
+        st.subheader(":material/calendar_month: Historical Congestion Heatmap")
         st.caption(
             "Identify the exact hours and days with the worst traffic jams. (Data recorded between 05:00 and 22:00)"
         )
 
-        # Pivot the table to create the grid
         pivot_data = heatmap_data.pivot(
             index="Day", columns="Hour", values="delay_mins"
         ).reindex(days_order)
 
-        # Ensure all our active hours (5 to 22) exist as columns, even if no data was captured yet
         active_hours = list(range(5, 23))
-        pivot_data = pivot_data.reindex(columns=active_hours)
-
-        # Fill empty cells with 0 so the chart draws cleanly
-        pivot_data = pivot_data.fillna(0)
-
-        # Format the column headers to look like real times (e.g., '07:00' instead of '7')
+        pivot_data = pivot_data.reindex(columns=active_hours).fillna(0)
         formatted_hours = [f"{h:02d}:00" for h in pivot_data.columns]
 
-        # Build the Plotly Heatmap
         fig_heatmap = px.imshow(
             pivot_data,
             labels=dict(x="Time of Day", y="Day of Week", color="Avg Delay (Mins)"),
@@ -322,46 +305,115 @@ if selected_road:
             color_continuous_scale="YlOrRd",
             aspect="auto",
             template="plotly_dark",
-            height=500,  # Forces the chart to be taller so squares aren't squished
+            height=500,
         )
 
-        # --- Mobile UI Enhancements ---
         fig_heatmap.update_layout(
-            margin=dict(
-                l=10, r=10, t=40, b=80
-            ),  # Increased bottom margin to make room for legend
+            margin=dict(l=10, r=10, t=40, b=80),
             coloraxis_colorbar=dict(
                 title="Avg Delay",
-                orientation="h",  # Makes the legend horizontal
-                y=-0.5,  # Pushes it below the x-axis text
+                orientation="h",
+                y=-0.5,
             ),
         )
 
         fig_heatmap.update_xaxes(
             side="bottom",
-            tickangle=-45,  # Tilts the text diagonally so it is easy to read
+            tickangle=-45,
             tickmode="auto",
-            nticks=10,  # Tells Plotly to skip some labels if the screen is too small
+            nticks=10,
         )
 
-        # Display it in Streamlit
         st.plotly_chart(fig_heatmap, use_container_width=True)
+
+        # --- NEW: Time-Shift Commute Optimizer ---
+        st.markdown("---")
+        st.subheader(":material/update: Time-Shift Commute Optimizer")
+        st.caption(
+            "Select your planned departure time to see if leaving slightly earlier or later saves you from traffic."
+        )
+
+        if not heatmap_data.empty:
+            col_opt1, col_opt2 = st.columns(2)
+
+            with col_opt1:
+                target_day = st.selectbox("Select Travel Day", days_order)
+
+            with col_opt2:
+                available_hours = [f"{h:02d}:00" for h in range(5, 23)]
+                target_hour_str = st.selectbox(
+                    "Planned Departure Time", available_hours, index=3
+                )
+                target_hour_int = int(target_hour_str.split(":")[0])
+
+            day_data = heatmap_data[heatmap_data["Day"] == target_day]
+
+            if not day_data.empty:
+                planned_delay_series = day_data[day_data["Hour"] == target_hour_int][
+                    "delay_mins"
+                ]
+                planned_delay = (
+                    planned_delay_series.values[0]
+                    if not planned_delay_series.empty
+                    else 0
+                )
+
+                early_delay_series = day_data[day_data["Hour"] == target_hour_int - 1][
+                    "delay_mins"
+                ]
+                early_delay = (
+                    early_delay_series.values[0] if not early_delay_series.empty else 0
+                )
+
+                late_delay_series = day_data[day_data["Hour"] == target_hour_int + 1][
+                    "delay_mins"
+                ]
+                late_delay = (
+                    late_delay_series.values[0] if not late_delay_series.empty else 0
+                )
+
+                best_alternative = None
+                time_saved = 0
+                alt_time_str = ""
+
+                if target_hour_int - 1 >= 5 and early_delay < planned_delay:
+                    best_alternative = "earlier"
+                    time_saved = planned_delay - early_delay
+                    alt_time_str = f"{target_hour_int - 1:02d}:00"
+
+                if (
+                    target_hour_int + 1 <= 22
+                    and late_delay < planned_delay
+                    and (planned_delay - late_delay) > time_saved
+                ):
+                    best_alternative = "later"
+                    time_saved = planned_delay - late_delay
+                    alt_time_str = f"{target_hour_int + 1:02d}:00"
+
+                st.write("")
+
+                if best_alternative and time_saved > 0.5:
+                    st.success(
+                        f"**Pro Tip:** If you shift your commute to **{alt_time_str}**, you could avoid peak congestion and save **{time_saved:.1f} minutes** of sitting in traffic!",
+                        icon=":material/tips_and_updates:",
+                    )
+                else:
+                    st.info(
+                        f"**Great Choice:** **{target_hour_str}** is currently one of the optimal times to travel. Adjusting your schedule by an hour won't save you any significant time.",
+                        icon=":material/task_alt:",
+                    )
 
         # --- 6. The Future Forecaster (Predictive Analytics) ---
         st.markdown("---")
-        st.subheader("🔮 12-Hour Traffic Forecast")
+        st.subheader(":material/online_prediction: 12-Hour Traffic Forecast")
         st.caption(
             "Predicting upcoming congestion based on historical patterns. Accuracy improves as more data is collected."
         )
 
         if not heatmap_data.empty:
-            # 1. Get the current time locally
             now = pd.Timestamp.now(tz="Africa/Dar_es_Salaam")
-
-            # 2. Generate a list of the next 12 hours
             future_times = [now + pd.Timedelta(hours=i) for i in range(13)]
 
-            # 3. Create a dataframe to hold our future timeline
             future_df = pd.DataFrame(
                 {
                     "timestamp": future_times,
@@ -370,15 +422,12 @@ if selected_road:
                 }
             )
 
-            # 4. Merge our future timeline with our historical 'knowledge base' (heatmap_data)
             forecast_df = pd.merge(
                 future_df, heatmap_data, on=["Day", "Hour"], how="left"
             )
 
-            # 5. Clean up the data: Fill hours with no data (like 11 PM to 5 AM) with 0 delay
             forecast_df["delay_mins"] = forecast_df["delay_mins"].fillna(0)
 
-            # Create a clean label for the X-axis (e.g., 'Today 14:00' or 'Tomorrow 02:00')
             def format_forecast_time(t):
                 day_label = "Today" if t.date() == now.date() else "Tomorrow"
                 return f"{day_label} {t.strftime('%H:00')}"
@@ -387,7 +436,6 @@ if selected_road:
                 format_forecast_time
             )
 
-            # 6. Build the Predictive Line Chart
             fig_forecast = px.line(
                 forecast_df,
                 x="time_label",
@@ -400,37 +448,29 @@ if selected_road:
                 template="plotly_dark",
             )
 
-            # Make the line look cool and futuristic (cyan color, filled area)
             fig_forecast.update_traces(line_color="#00d2ff", fill="tozeroy")
-
-            # Display it in Streamlit
             st.plotly_chart(fig_forecast, use_container_width=True)
 
         # --- 7. Data Pipeline Health Monitor (Admin View) ---
         st.markdown("---")
 
-        # We use an expander so it doesn't clutter the main user dashboard
-        with st.expander("⚙️ System Admin: Pipeline Health Monitor", expanded=False):
+        with st.expander(
+            ":material/admin_panel_settings: System Admin: Pipeline Health Monitor",
+            expanded=False,
+        ):
             st.caption(
                 "Real-time diagnostics of your GitHub Actions scraper and Firebase database integrity."
             )
 
             if not hist_df.empty:
-                # 1. Sort the dataframe by time just to be safe
                 df_health = hist_df.sort_values("timestamp")
-
-                # 2. Calculate the typical time between scraper runs
-                # .diff() finds the difference between consecutive rows
                 time_diffs = df_health["timestamp"].diff()
                 median_interval = time_diffs.median()
 
-                # 3. Calculate Uptime (Expected vs Actual Data Points)
-                # How long has the scraper been running in total?
                 total_duration = (
                     df_health["timestamp"].max() - df_health["timestamp"].min()
                 )
 
-                # Prevent division by zero if there's only one row of data
                 if pd.notna(median_interval) and median_interval.total_seconds() > 0:
                     expected_runs = (
                         int(
@@ -444,19 +484,16 @@ if selected_road:
 
                 actual_runs = len(df_health)
 
-                # Calculate the percentage (capped at 100%)
                 uptime_pct = (
                     min((actual_runs / expected_runs) * 100, 100.0)
                     if expected_runs > 0
                     else 100.0
                 )
 
-                # 4. Check for Data Corruption (Null values)
                 null_weather = df_health["weather"].isnull().sum()
                 null_delay = df_health["delay_mins"].isnull().sum()
                 total_nulls = null_weather + null_delay
 
-                # 5. Build the UI Layout
                 col_admin1, col_admin2, col_admin3 = st.columns(3)
 
                 with col_admin1:
@@ -471,7 +508,6 @@ if selected_road:
                     )
 
                 with col_admin2:
-                    # Show green if high uptime, red if dropping
                     uptime_color = "normal" if uptime_pct >= 90 else "inverse"
                     st.metric(
                         label="Scraper Uptime",
