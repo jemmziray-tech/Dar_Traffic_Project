@@ -163,7 +163,9 @@ if selected_road:
         df_heat = hist_df.copy()
         df_heat["Hour"] = df_heat["timestamp"].dt.hour
         df_heat["Day"] = df_heat["timestamp"].dt.day_name()
-        df_heat = df_heat[(df_heat["Hour"] >= 5) & (df_heat["Hour"] <= 22)]
+
+        # UPDATED: Filter strictly between 06:00 and 23:00
+        df_heat = df_heat[(df_heat["Hour"] >= 6) & (df_heat["Hour"] <= 23)]
 
         days_order = [
             "Monday",
@@ -229,29 +231,41 @@ if selected_road:
 
         st.subheader(":material/calendar_month: Historical Congestion Heatmap")
         st.caption(
-            "Identify the exact hours and days with the worst traffic jams. (Data recorded between 05:00 and 22:00)"
+            "Identify the exact hours and days with the worst traffic jams. (Data recorded between 06:00 and 23:00)"
         )
 
         pivot_data = heatmap_data.pivot(
             index="Day", columns="Hour", values="delay_mins"
         ).reindex(days_order)
 
-        active_hours = list(range(5, 23))
+        # UPDATED: Force the columns (hours) to be exactly 6 through 23 and fill missing with 0
+        active_hours = list(range(6, 24))
         pivot_data = pivot_data.reindex(columns=active_hours).fillna(0)
         formatted_hours = [f"{h:02d}:00" for h in pivot_data.columns]
+
+        # UPDATED: Custom Traffic Color Scale (Green -> Yellow -> Orange -> Red)
+        traffic_colors = [
+            [0.0, "#28a745"],  # 0 delay = Green
+            [0.3, "#ffc107"],  # Slight delay = Yellow
+            [0.6, "#fd7e14"],  # Moderate delay = Orange
+            [1.0, "#dc3545"],  # Heavy delay = Red
+        ]
 
         fig_heatmap = px.imshow(
             pivot_data,
             labels=dict(x="Time of Day", y="Day of Week", color="Avg Delay (Mins)"),
             x=formatted_hours,
             y=pivot_data.index,
-            color_continuous_scale="YlOrRd",
+            color_continuous_scale=traffic_colors,
             aspect="auto",
             template="plotly_dark",
             height=500,
         )
 
         fig_heatmap.update_layout(
+            xaxis_nticks=len(
+                active_hours
+            ),  # UPDATED: Forces every single hour tick to show up perfectly
             margin=dict(l=10, r=10, t=40, b=80),
             coloraxis_colorbar=dict(
                 title="Avg Delay",
@@ -260,11 +274,11 @@ if selected_road:
             ),
         )
 
-        fig_heatmap.update_xaxes(
-            side="bottom",
-            tickangle=-45,
-            tickmode="auto",
-            nticks=10,
+        fig_heatmap.update_xaxes(side="bottom", tickangle=-45, tickmode="auto")
+
+        # UPDATED: Clean sentence tooltips
+        fig_heatmap.update_traces(
+            hovertemplate="<b>%{y} at %{x}</b><br>Average Delay: %{z:.1f} mins<extra></extra>"
         )
 
         st.plotly_chart(fig_heatmap, use_container_width=True)
@@ -283,9 +297,10 @@ if selected_road:
                 target_day = st.selectbox("Select Travel Day", days_order)
 
             with col_opt2:
-                available_hours = [f"{h:02d}:00" for h in range(5, 23)]
+                # UPDATED: Matches the new 6 to 23 schedule
+                available_hours = [f"{h:02d}:00" for h in range(6, 24)]
                 target_hour_str = st.selectbox(
-                    "Planned Departure Time", available_hours, index=3
+                    "Planned Departure Time", available_hours, index=2
                 )
                 target_hour_int = int(target_hour_str.split(":")[0])
 
@@ -319,13 +334,15 @@ if selected_road:
                 time_saved = 0
                 alt_time_str = ""
 
-                if target_hour_int - 1 >= 5 and early_delay < planned_delay:
+                # UPDATED: Respects the 6 AM boundary
+                if target_hour_int - 1 >= 6 and early_delay < planned_delay:
                     best_alternative = "earlier"
                     time_saved = planned_delay - early_delay
                     alt_time_str = f"{target_hour_int - 1:02d}:00"
 
+                # UPDATED: Respects the 11 PM (23:00) boundary
                 if (
-                    target_hour_int + 1 <= 22
+                    target_hour_int + 1 <= 23
                     and late_delay < planned_delay
                     and (planned_delay - late_delay) > time_saved
                 ):
