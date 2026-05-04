@@ -1,12 +1,13 @@
 name: Traffic Scraper Automation
 
 on:
-  schedule:
-    # Runs 4 times an hour on "off-minutes" (7, 22, 37, 52) to bypass GitHub Actions server queues.
-    # Runs ONLY between 02:00 UTC and 20:00 UTC.
-    # 02:00 UTC = 5:00 AM EAT (Tanzania Time)
-    # 20:00 UTC = 11:00 PM EAT (Tanzania Time)
-    - cron: '7,22,37,52 2-20 * * *' 
+  # 1. We removed the unreliable 'schedule' cron job.
+  # 2. NEW: We added 'repository_dispatch'. This opens a secure "door"
+  # allowing external services (like Google Cloud) to trigger this script instantly.
+  repository_dispatch:
+    types: [trigger-scraper]
+
+  # Keeps the manual button in the GitHub UI just in case you need to test it!
   workflow_dispatch:
 
 jobs:
@@ -19,8 +20,8 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip' # Pro-tip: Caches dependencies to make the bot run even faster!
+          python-version: "3.10"
+          cache: "pip" # Pro-tip: Caches dependencies to make the bot run even faster!
 
       - name: Install dependencies
         run: |
