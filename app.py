@@ -241,7 +241,7 @@ if not df.empty:
                 layers=[layer],
                 initial_view_state=view_state,
                 tooltip=tooltip,
-                map_style="mapbox://styles/mapbox/dark-v11",
+                map_style="dark",
             )
         )
 
