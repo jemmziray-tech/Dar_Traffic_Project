@@ -47,83 +47,8 @@ def get_historical_data(road_id):
     return pd.DataFrame([doc.to_dict() for doc in results])
 
 
-@st.cache_data(ttl=60)  # Updates every 1 minute
-def get_live_city_data():
-    # Fetch the latest snapshot for ALL roads from the live_traffic collection
-    docs = db.collection("live_traffic").stream()
-    data = []
-    for doc in docs:
-        doc_data = doc.to_dict()
-        doc_data["road_id"] = doc.id
-        data.append(doc_data)
-    return pd.DataFrame(data)
-
-
-# Dictionary of GPS Coordinates
-ROAD_COORDS = {
-    "ubungo": {"lat": -6.7844, "lon": 39.2131},
-    "sam_nujoma": {"lat": -6.7797, "lon": 39.2272},
-    "kariakoo": {"lat": -6.8200, "lon": 39.2736},
-    "uhuru_street": {"lat": -6.8183, "lon": 39.2683},
-    "kilwa_mbagala": {"lat": -6.8781, "lon": 39.2711},
-}
-
-
 # --- 4. Main UI ---
 st.title(":material/monitoring: Historical Traffic Intelligence")
-
-# --- 9. Global City-Wide Map ---
-st.markdown("### :material/map: Live City-Wide Traffic Map")
-
-city_df = get_live_city_data()
-
-if not city_df.empty:
-    # 1. Map the GPS coordinates to the dataframe based on the road_id
-    city_df["lat"] = city_df["road_id"].map(
-        lambda x: ROAD_COORDS.get(x, {}).get("lat", -6.8200)
-    )
-    city_df["lon"] = city_df["road_id"].map(
-        lambda x: ROAD_COORDS.get(x, {}).get("lon", 39.2736)
-    )
-
-    # 2. Clean up the road names for the tooltip
-    city_df["Road Name"] = city_df["road_id"].str.replace("_", " ").str.title()
-
-    # 3. Handle base cases where delay is 0 so the dot doesn't disappear completely
-    city_df["dot_size"] = city_df["delay_mins"].apply(lambda x: x if x > 0 else 0.5)
-
-    # 4. Draw the interactive Mapbox
-    fig_map = px.scatter_mapbox(
-        city_df,
-        lat="lat",
-        lon="lon",
-        color="delay_mins",
-        size="dot_size",
-        size_max=20,
-        hover_name="Road Name",
-        hover_data={
-            "status": True,
-            "speed_kmh": True,
-            "delay_mins": True,
-            "lat": False,
-            "lon": False,
-            "dot_size": False,
-        },
-        color_continuous_scale=[
-            "#28a745",
-            "#ffc107",
-            "#dc3545",
-        ],  # Green -> Yellow -> Red
-        zoom=11.5,
-        mapbox_style="carto-darkmatter",
-    )
-
-    # Tighten margins so the map fills the screen beautifully
-    fig_map.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-
-    st.plotly_chart(fig_map, use_container_width=True)
-    st.markdown("---")
-# --- End Global Map ---
 
 st.sidebar.header("Analysis Filters")
 
@@ -256,31 +181,49 @@ if selected_road:
 
         # --- AI Traffic Reporter: Automated Insights ---
         if not heatmap_data.empty:
-            worst_idx = heatmap_data["delay_mins"].idxmax()
-            worst_row = heatmap_data.loc[worst_idx]
-            worst_day = worst_row["Day"]
-            worst_hour_str = f"{int(worst_row['Hour']):02d}:00"
-            worst_delay = worst_row["delay_mins"]
-
-            best_idx = heatmap_data["delay_mins"].idxmin()
-            best_row = heatmap_data.loc[best_idx]
-            best_day = best_row["Day"]
-            best_hour_str = f"{int(best_row['Hour']):02d}:00"
-            best_delay = best_row["delay_mins"]
-
             st.subheader(":material/analytics: Automated Insights")
 
-            st.warning(
-                f"**Peak Congestion Detected:** Based on historical aggregates, the most severe traffic typically occurs on "
-                f"**{worst_day}s at {worst_hour_str}**, with an average delay of **{worst_delay:.1f} minutes**.",
-                icon=":material/warning:",
-            )
+            # Create two side-by-side columns for our insights
+            col_insight1, col_insight2 = st.columns(2)
 
-            st.success(
-                f"**Optimal Transit Window:** For the smoothest commute, historical data suggests traveling on "
-                f"**{best_day}s around {best_hour_str}**. Average delays drop to **{best_delay:.1f} minutes**.",
-                icon=":material/check_circle:",
-            )
+            with col_insight1:
+                st.error(
+                    "**Peak Congestion (Top 3 to Avoid):**", icon=":material/warning:"
+                )
+
+                # Sort the dataframe to find the absolute highest average delays
+                worst_times = heatmap_data.sort_values(
+                    by="delay_mins", ascending=False
+                ).head(3)
+
+                # Loop through the top 3 and print them out
+                for _, row in worst_times.iterrows():
+                    st.write(
+                        f"- **{row['Day']}s at {int(row['Hour']):02d}:00** ({row['delay_mins']:.1f} mins)"
+                    )
+
+            with col_insight2:
+                st.success(
+                    "**Optimal Transit (Top 3 to Go):**", icon=":material/check_circle:"
+                )
+
+                # Filter out zeroes (in case some hours haven't been scraped yet)
+                valid_data = heatmap_data[heatmap_data["delay_mins"] > 0]
+
+                if not valid_data.empty:
+                    # Sort to find the absolute lowest average delays
+                    best_times = valid_data.sort_values(
+                        by="delay_mins", ascending=True
+                    ).head(3)
+
+                    # Loop through the bottom 3 and print them out
+                    for _, row in best_times.iterrows():
+                        st.write(
+                            f"- **{row['Day']}s at {int(row['Hour']):02d}:00** ({row['delay_mins']:.1f} mins)"
+                        )
+                else:
+                    st.write("Collecting more data to find optimal times...")
+
             st.markdown("---")
         # --- End of Insights Engine ---
 
