@@ -1,0 +1,38 @@
+name: Scheduled AI Retraining
+
+on:
+  schedule:
+    # Runs at 00:00 every Monday (UTC)
+    - cron: "0 0 * * 1"
+  workflow_dispatch: # Allows you to run it manually for testing
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install pandas scikit-learn joblib firebase-admin google-cloud-firestore
+
+      - name: Create Firebase Key File
+        run: |
+          echo '${{ secrets.FIREBASE_KEY }}' > firebase-key.json
+
+      - name: Run Training Script
+        run: python train_model.py
+
+      - name: Commit and Push New Model
+        run: |
+          git config --global user.name 'AI Retraining Bot'
+          git config --global user.email 'bot@ujenzismart.com'
+          git add traffic_model.pkl
+          git commit -m "auto: periodic model retraining with latest Firebase data" || echo "No changes to commit"
+          git push

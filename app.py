@@ -8,6 +8,8 @@ import pydeck as pdk
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
+import joblib  # For loading the AI Model
+import plotly.express as px  # For the AI forecast curve
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -70,7 +72,7 @@ ROAD_COORDS = {
 
 
 # --- 4. Helper Functions ---
-@st.cache_data(ttl=60)  # Caches data for 60 seconds
+@st.cache_data(ttl=60)
 def get_live_data():
     docs = db.collection("live_traffic").stream()
     data = []
@@ -80,7 +82,6 @@ def get_live_data():
         coords = ROAD_COORDS.get(doc.id, {"lat": -6.792, "lon": 39.239})
         row["lat"], row["lon"] = coords["lat"], coords["lon"]
 
-        # Assign RGB values for the 3D Pydeck Map
         if row["status"] == "Smooth":
             row["color"] = [40, 167, 69, 200]
         elif row["status"] == "Moderate":
@@ -88,26 +89,23 @@ def get_live_data():
         else:
             row["color"] = [220, 53, 69, 255]
 
-        # Ensure a minimum elevation so even 'Smooth' roads show a tiny blip on the 3D map
         row["elevation_val"] = max(row["delay_mins"], 0.5)
-
         data.append(row)
     return pd.DataFrame(data)
 
 
 df_raw = get_live_data()
 
-# --- 5. SIDEBAR: Control Center & Provenance ---
+# --- 5. SIDEBAR: Control Center ---
 st.sidebar.title(":material/tune: COMMAND CENTER")
 
-# --- NEW: Live Sync Button ---
 if st.sidebar.button(
     "Sync Live Telemetry", icon=":material/sync:", use_container_width=True
 ):
     with st.spinner("Pinging satellites and updating database..."):
-        time.sleep(0.8)  # Artificial delay to let the user see the spinner
-        get_live_data.clear()  # Busts the 60-second cache
-        st.rerun()  # Instantly reloads the UI with fresh data
+        time.sleep(0.8)
+        get_live_data.clear()
+        st.rerun()
 
 tz = pytz.timezone("Africa/Dar_es_Salaam")
 st.sidebar.info(
@@ -132,12 +130,9 @@ if not df.empty:
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### :material/database: Data Provenance")
-st.sidebar.caption(
-    "**Traffic Data:** Google Maps Distance Matrix API (Live best_guess model)"
-)
+st.sidebar.caption("**Traffic Data:** Google Maps Distance Matrix API")
 st.sidebar.caption("**Weather Data:** Open-Meteo Global API")
 st.sidebar.caption("**Infrastructure:** Firebase & GitHub Actions")
-
 st.sidebar.markdown("---")
 st.sidebar.caption("Built by John Mziray | Data Engineering Portfolio")
 
@@ -152,7 +147,6 @@ if not df.empty:
     total_delay = df_raw["delay_mins"].sum()
     efficiency = 100 - min((total_delay / 150) * 100, 100)
 
-    # Safely get the latest sync time from the dataframe
     if "timestamp" in df_raw.columns:
         latest_time = pd.to_datetime(df_raw["timestamp"].max()).tz_convert(
             "Africa/Dar_es_Salaam"
@@ -168,14 +162,19 @@ if not df.empty:
         "LAST SYNC", time_str, delta="Verified by Google API", delta_color="normal"
     )
 
-    # --- ADVANCED INTELLIGENCE SECTION ---
-    with st.expander(":material/memory: Advanced System Intelligence", expanded=True):
-        ai_col1, ai_col2 = st.columns([2, 1])
-        with ai_col1:
+    st.markdown("---")
+
+    # --- ADVANCED INTELLIGENCE & AI PREDICTION ---
+    col_ai_left, col_ai_right = st.columns([1, 2])
+
+    with col_ai_left:
+        with st.container(border=True):
+            st.subheader(":material/memory: System Alerts")
             bottleneck_row = df_raw.loc[df_raw["delay_mins"].idxmax()]
+
             if total_delay > 60:
                 st.error(
-                    f"**Significant Gridlock:** High congestion detected at **{bottleneck_row['name']}**.",
+                    f"**Gridlock Detected:** Severe congestion at **{bottleneck_row['name']}**.",
                     icon=":material/gpp_bad:",
                 )
             elif (
@@ -191,9 +190,126 @@ if not df.empty:
                     "**Optimal Flow:** City traffic is moving within normal parameters.",
                     icon=":material/gpp_good:",
                 )
-        with ai_col2:
+
             st.write(f"**City Flow Efficiency:** {efficiency:.1f}%")
             st.progress(efficiency / 100)
+
+    with col_ai_right:
+        with st.container(border=True):
+            st.subheader(":material/psychology: AI Traffic Predictor")
+
+            if os.path.exists("traffic_model.pkl"):
+                # Load the AI brain
+                ai_model = joblib.load("traffic_model.pkl")
+
+                # UI Controls
+                ai_p1, ai_p2, ai_p3, ai_p4 = st.columns(4)
+
+                with ai_p1:
+                    p_road = st.selectbox("Road", list(ROAD_COORDS.keys()))
+                with ai_p2:
+                    p_day = st.selectbox(
+                        "Day",
+                        [
+                            "Monday",
+                            "Tuesday",
+                            "Wednesday",
+                            "Thursday",
+                            "Friday",
+                            "Saturday",
+                            "Sunday",
+                        ],
+                        index=datetime.now(tz).weekday(),
+                    )
+                with ai_p3:
+                    # Generate 15-minute intervals
+                    time_options = [
+                        f"{h:02d}:{m:02d}"
+                        for h in range(6, 24)
+                        for m in (0, 15, 30, 45)
+                    ]
+                    # Attempt to default to the current hour
+                    current_hour = datetime.now(tz).hour
+                    default_time = (
+                        f"{current_hour:02d}:00" if 6 <= current_hour <= 23 else "08:00"
+                    )
+
+                    p_time_str = st.selectbox(
+                        "Time",
+                        time_options,
+                        index=(
+                            time_options.index(default_time)
+                            if default_time in time_options
+                            else time_options.index("08:00")
+                        ),
+                    )
+                with ai_p4:
+                    p_weather = st.selectbox("Weather", ["Clear", "Rainy", "Cloudy"])
+
+                # Convert target time string to fractional hour
+                h, m = map(int, p_time_str.split(":"))
+                target_fraction = h + (m / 60.0)
+
+                # --- GENERATE A 2.5 HOUR FORECAST CURVE ---
+                start_frac = max(6.0, target_fraction - 1.25)
+                end_frac = min(23.75, target_fraction + 1.25)
+
+                step_count = int((end_frac - start_frac) / 0.25) + 1
+                curve_hours = [start_frac + (i * 0.25) for i in range(step_count)]
+
+                curve_df = pd.DataFrame(
+                    {
+                        "road_id": [p_road] * len(curve_hours),
+                        "Hour": curve_hours,
+                        "Day": [p_day] * len(curve_hours),
+                        "Condition": [p_weather] * len(curve_hours),
+                    }
+                )
+
+                curve_df["Predicted_Delay"] = ai_model.predict(curve_df)
+
+                # Format math (7.5) back to readable time (07:30) for the chart
+                def format_frac_time(f):
+                    hr = int(f)
+                    mn = int(round((f - hr) * 60))
+                    return f"{hr:02d}:{mn:02d}"
+
+                curve_df["Time"] = curve_df["Hour"].apply(format_frac_time)
+
+                exact_prediction = curve_df[curve_df["Hour"] == target_fraction][
+                    "Predicted_Delay"
+                ].values[0]
+
+                # --- DISPLAY RESULTS ---
+                st.metric(
+                    label=f"Predicted Delay for {p_time_str}",
+                    value=f"{exact_prediction:.1f} Mins",
+                )
+
+                # Draw Plotly curve
+                fig = px.line(
+                    curve_df,
+                    x="Time",
+                    y="Predicted_Delay",
+                    markers=True,
+                    template="plotly_dark",
+                    height=200,
+                )
+
+                fig.update_traces(line_color="#00d2ff", line_width=3)
+                fig.update_layout(
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    xaxis_title=None,
+                    yaxis_title="Mins Delay",
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+            else:
+                st.info(
+                    "AI model is currently training. Automated retraining happens weekly.",
+                    icon=":material/pending_actions:",
+                )
 
     st.markdown("---")
 
@@ -206,7 +322,6 @@ if not df.empty:
     )
 
     with tab1:
-        # --- NEW: 3D ColumnLayer Map ---
         tooltip = {
             "html": "<b>{name}</b><br/>Speed: {speed_kmh} km/h<br/>Status: {status}<br/>Delay: {delay_mins} mins",
             "style": {
@@ -217,21 +332,19 @@ if not df.empty:
             },
         }
 
-        # Pitched at 45 degrees to show off the 3D elevation
         view_state = pdk.ViewState(
             latitude=-6.81, longitude=39.25, zoom=11.5, pitch=45, bearing=0
         )
 
-        # Upgraded to ColumnLayer
         layer = pdk.Layer(
             "ColumnLayer",
             df,
             get_position=["lon", "lat"],
             get_elevation="elevation_val",
-            elevation_scale=150,  # Multiplier for how tall the blocks get
-            radius=250,  # Thickness of the pillars
+            elevation_scale=150,
+            radius=250,
             get_fill_color="color",
-            extruded=True,  # Turns on the 3D rendering
+            extruded=True,
             pickable=True,
             auto_highlight=True,
         )
@@ -284,14 +397,10 @@ if not df.empty:
     ):
         st.markdown("""
         **The Architecture of Trust:**
-        
-        * :material/memory: **Autonomous Ingestion:** An asynchronous GitHub Actions server continuously monitors and pings the **Google Maps Enterprise API** and **Open-Meteo API** throughout the day to capture dynamic flow states.
-        * :material/account_tree: **Algorithm:** It requests the current driving time for specific road coordinates and compares it against the "free-flowing" historical average to calculate the exact `delay_mins`.
-        * :material/database: **Cloud Storage:** The processed payload is injected into a NoSQL **Google Cloud Firestore** database.
-        * :material/speed: **Live Rendering:** This Streamlit app listens to the database and re-renders the 3D Pydeck map and analytical KPIs instantly.
-        
-        ---
-        *This is a live Digital Twin of Dar es Salaam's traffic arteries.* [View the Open Source Pipeline on GitHub](https://github.com/jemmziray-tech/Dar_Traffic_Project)
+        * :material/memory: **Autonomous Ingestion:** GitHub Actions asynchronous server monitoring Google Maps Enterprise & Open-Meteo APIs.
+        * :material/account_tree: **Machine Learning:** Scikit-Learn Random Forest Regressor calculates exact fractional-hour predictions across 10 global road networks.
+        * :material/database: **Cloud Storage:** Google Cloud Firestore NoSQL Database.
+        * :material/speed: **Live Rendering:** Real-time 3D telemetry rendering via Streamlit and Pydeck.
         """)
 else:
     st.info("No data available based on current filters.", icon=":material/info:")
