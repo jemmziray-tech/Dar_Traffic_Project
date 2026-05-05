@@ -8,8 +8,8 @@ import pydeck as pdk
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-import joblib  # For loading the AI Model
-import plotly.express as px  # For the AI forecast curve
+import joblib
+import plotly.express as px
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -18,11 +18,10 @@ st.set_page_config(
     page_icon=":material/satellite_alt:",
 )
 
-# --- CUSTOM CSS: PULSING RADAR ANIMATIONS & CLEAN UI ---
+# --- CUSTOM CSS ---
 st.markdown(
     """
 <style>
-/* Pulsing status indicators */
 .blob { border-radius: 50%; margin-right: 12px; height: 14px; width: 14px; transform: scale(1); }
 .blob.green { background: rgba(40, 167, 69, 1); animation: pulse-green 2s infinite; }
 @keyframes pulse-green { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); } }
@@ -30,8 +29,6 @@ st.markdown(
 @keyframes pulse-yellow { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); } }
 .blob.red { background: rgba(220, 53, 69, 1); animation: pulse-red 1.2s infinite; }
 @keyframes pulse-red { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.8); } 70% { transform: scale(1.1); box-shadow: 0 0 0 12px rgba(220, 53, 69, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
-
-/* Clean up Streamlit's default padding for a dashboard feel */
 .block-container { padding-top: 2rem; padding-bottom: 2rem; }
 </style>
 """,
@@ -136,6 +133,36 @@ st.sidebar.caption("**Infrastructure:** Firebase & GitHub Actions")
 st.sidebar.markdown("---")
 st.sidebar.caption("Built by John Mziray | Data Engineering Portfolio")
 
+# --- NEW: AI Model Health Sidebar Section ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🧠 AI Model Health")
+
+if os.path.exists("model_metrics.csv"):
+    try:
+        metrics_df = pd.read_csv("model_metrics.csv")
+        latest_metrics = metrics_df.iloc[-1]
+
+        st.sidebar.metric(
+            label="Current AI Accuracy (Error Margin)",
+            value=f"± {latest_metrics['MAE_Minutes']} Mins",
+        )
+        st.sidebar.caption(
+            f"**Knowledge Base:** Trained on {int(latest_metrics['Total_Rows_Trained'])} historical data points."
+        )
+        st.sidebar.caption(f"**Last Retrained:** {latest_metrics['Date']}")
+
+        if len(metrics_df) > 1:
+            with st.sidebar.expander("📈 View Learning Curve"):
+                st.caption("Lower error means the AI is getting smarter!")
+                st.line_chart(metrics_df.set_index("Date")["MAE_Minutes"])
+
+    except Exception as e:
+        st.sidebar.caption("Parsing model metrics...")
+else:
+    st.sidebar.caption(
+        "Model metrics will appear after the next automated training cycle."
+    )
+
 # --- 6. MAIN DASHBOARD ---
 st.title("DAR ES SALAAM TRAFFIC INTELLIGENCE")
 st.markdown("---")
@@ -199,10 +226,8 @@ if not df.empty:
             st.subheader(":material/psychology: AI Traffic Predictor")
 
             if os.path.exists("traffic_model.pkl"):
-                # Load the AI brain
                 ai_model = joblib.load("traffic_model.pkl")
 
-                # UI Controls
                 ai_p1, ai_p2, ai_p3, ai_p4 = st.columns(4)
 
                 with ai_p1:
@@ -222,18 +247,15 @@ if not df.empty:
                         index=datetime.now(tz).weekday(),
                     )
                 with ai_p3:
-                    # Generate 15-minute intervals
                     time_options = [
                         f"{h:02d}:{m:02d}"
                         for h in range(6, 24)
                         for m in (0, 15, 30, 45)
                     ]
-                    # Attempt to default to the current hour
                     current_hour = datetime.now(tz).hour
                     default_time = (
                         f"{current_hour:02d}:00" if 6 <= current_hour <= 23 else "08:00"
                     )
-
                     p_time_str = st.selectbox(
                         "Time",
                         time_options,
@@ -246,11 +268,9 @@ if not df.empty:
                 with ai_p4:
                     p_weather = st.selectbox("Weather", ["Clear", "Rainy", "Cloudy"])
 
-                # Convert target time string to fractional hour
                 h, m = map(int, p_time_str.split(":"))
                 target_fraction = h + (m / 60.0)
 
-                # --- GENERATE A 2.5 HOUR FORECAST CURVE ---
                 start_frac = max(6.0, target_fraction - 1.25)
                 end_frac = min(23.75, target_fraction + 1.25)
 
@@ -268,25 +288,21 @@ if not df.empty:
 
                 curve_df["Predicted_Delay"] = ai_model.predict(curve_df)
 
-                # Format math (7.5) back to readable time (07:30) for the chart
                 def format_frac_time(f):
                     hr = int(f)
                     mn = int(round((f - hr) * 60))
                     return f"{hr:02d}:{mn:02d}"
 
                 curve_df["Time"] = curve_df["Hour"].apply(format_frac_time)
-
                 exact_prediction = curve_df[curve_df["Hour"] == target_fraction][
                     "Predicted_Delay"
                 ].values[0]
 
-                # --- DISPLAY RESULTS ---
                 st.metric(
                     label=f"Predicted Delay for {p_time_str}",
                     value=f"{exact_prediction:.1f} Mins",
                 )
 
-                # Draw Plotly curve
                 fig = px.line(
                     curve_df,
                     x="Time",
@@ -295,7 +311,6 @@ if not df.empty:
                     template="plotly_dark",
                     height=200,
                 )
-
                 fig.update_traces(line_color="#00d2ff", line_width=3)
                 fig.update_layout(
                     margin=dict(l=0, r=0, t=10, b=0),
@@ -304,7 +319,6 @@ if not df.empty:
                 )
 
                 st.plotly_chart(fig, use_container_width=True)
-
             else:
                 st.info(
                     "AI model is currently training. Automated retraining happens weekly.",
@@ -331,11 +345,9 @@ if not df.empty:
                 "borderRadius": "4px",
             },
         }
-
         view_state = pdk.ViewState(
             latitude=-6.81, longitude=39.25, zoom=11.5, pitch=45, bearing=0
         )
-
         layer = pdk.Layer(
             "ColumnLayer",
             df,
@@ -348,7 +360,6 @@ if not df.empty:
             pickable=True,
             auto_highlight=True,
         )
-
         st.pydeck_chart(
             pdk.Deck(
                 layers=[layer],

@@ -33,6 +33,6 @@ jobs:
         run: |
           git config --global user.name 'AI Retraining Bot'
           git config --global user.email 'bot@ujenzismart.com'
-          git add traffic_model.pkl
-          git commit -m "auto: periodic model retraining with latest Firebase data" || echo "No changes to commit"
+          git add traffic_model.pkl model_metrics.csv
+          git commit -m "auto: periodic model retraining and metrics log" || echo "No changes to commit"
           git push
