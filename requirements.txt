@@ -1,10 +1,12 @@
 requests
 googlemaps
 firebase-admin
+google-cloud-firestore
 python-dotenv
 streamlit
 pandas
 plotly
 pytz
+pydeck
 scikit-learn
 joblib
