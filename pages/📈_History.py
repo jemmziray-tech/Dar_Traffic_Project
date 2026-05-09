@@ -41,7 +41,9 @@ def get_historical_data(road_id):
     query = (
         stats_ref.where("road_id", "==", road_id)
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
-        .limit(200)
+        .limit(
+            20000
+        )  # THE FIX: Increased from 200 so you get weeks of data, not just 2 days!
     )
     results = query.stream()
     return pd.DataFrame([doc.to_dict() for doc in results])
@@ -52,8 +54,16 @@ st.title(":material/monitoring: Historical Traffic Intelligence")
 
 st.sidebar.header("Analysis Filters")
 
+
+# THE FIX: Format the road names to look beautiful in the UI
+def format_road_name(r_id):
+    return str(r_id).replace("_", " ").title()
+
+
 roads = get_roads_list()
-selected_road = st.sidebar.selectbox("Choose a road to analyze", roads)
+selected_road = st.sidebar.selectbox(
+    "Choose a road to analyze", roads, format_func=format_road_name
+)
 
 if selected_road:
     hist_df = get_historical_data(selected_road)
@@ -66,7 +76,8 @@ if selected_road:
             "Africa/Dar_es_Salaam"
         )
 
-        st.subheader(f"Delay History: {selected_road}")
+        # Using the clean formatted name for the header
+        st.subheader(f"Delay History: {format_road_name(selected_road)}")
 
         # --- 8. The Live Pulse Benchmark ---
         # 1. Grab the absolute newest row of data
