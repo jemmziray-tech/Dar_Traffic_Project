@@ -25,7 +25,7 @@ jobs:
 
       - name: Create Firebase Key File
         run: |
-          echo '${{ secrets.FIREBASE_KEY }}' > firebase-key.json
+          echo '${{ secrets.FIREBASE_KEY_JSON }}' > firebase-key.json
 
       - name: Run Training Script
         run: python train_model.py
