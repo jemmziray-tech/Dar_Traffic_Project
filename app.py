@@ -35,18 +35,30 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- 2. Connect to Firebase ---
+# --- 2. Connect to Firebase (THE BULLETPROOF FIX) ---
 if not firebase_admin._apps:
     try:
         if os.path.exists("firebase-key.json"):
+            # Local development (Laptop)
             cred = credentials.Certificate("firebase-key.json")
+
         elif "firebase" in st.secrets:
-            key_dict = json.loads(st.secrets["firebase"]["key_data"])
-            cred = credentials.Certificate(key_dict)
+            # Cloud deployment (Streamlit)
+            if "key_data" in st.secrets["firebase"]:
+                # If you pasted the JSON block inside triple quotes
+                key_dict = json.loads(st.secrets["firebase"]["key_data"])
+                cred = credentials.Certificate(key_dict)
+            else:
+                # If you used direct TOML, wrap the Streamlit secret in a standard dict()
+                firebase_secrets = dict(st.secrets["firebase"])
+                cred = credentials.Certificate(firebase_secrets)
+
         else:
             st.error("No valid Firebase credentials found.", icon=":material/error:")
             st.stop()
+
         firebase_admin.initialize_app(cred)
+
     except Exception as e:
         st.error(f"Connection Error: {e}", icon=":material/wifi_off:")
         st.stop()
@@ -96,13 +108,16 @@ df_raw = get_live_data()
 # --- 5. SIDEBAR: Control Center ---
 st.sidebar.title(":material/tune: COMMAND CENTER")
 
+# UI Enhancement: Modern Toast Notifications for Sync
 if st.sidebar.button(
     "Sync Live Telemetry", icon=":material/sync:", use_container_width=True
 ):
-    with st.spinner("Pinging satellites and updating database..."):
-        time.sleep(0.8)
-        get_live_data.clear()
-        st.rerun()
+    st.toast("Pinging satellites...", icon="🛰️")
+    time.sleep(0.5)
+    get_live_data.clear()
+    st.toast("Database Updated Successfully!", icon="✅")
+    time.sleep(0.5)
+    st.rerun()
 
 tz = pytz.timezone("Africa/Dar_es_Salaam")
 st.sidebar.info(
@@ -133,7 +148,7 @@ st.sidebar.caption("**Infrastructure:** Firebase & GitHub Actions")
 st.sidebar.markdown("---")
 st.sidebar.caption("Built by John Mziray | Data Engineering Portfolio")
 
-# --- NEW: AI Model Health Sidebar Section ---
+# --- AI Model Health Sidebar Section ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🧠 AI Model Health")
 
