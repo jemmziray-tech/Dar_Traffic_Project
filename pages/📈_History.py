@@ -133,25 +133,38 @@ if selected_road:
         with col1:
             st.subheader("Speed vs Weather")
 
-            # --- Extract just the condition (Clear, Rainy, Cloudy) for the colors ---
+            # --- Extract just the condition (Clear, Rainy, Cloudy) ---
             hist_df["condition_only"] = hist_df["weather"].apply(
-                lambda x: x.split(", ")[1] if ", " in x else x
+                lambda x: x.split(", ")[1] if ", " in str(x) else x
             )
 
-            fig_speed = px.scatter(
+            # --- THE UPGRADE: A clean, analytical Box Plot ---
+            fig_speed = px.box(
                 hist_df,
-                x="timestamp",
+                x="condition_only",
                 y="speed_kmh",
                 color="condition_only",
-                size="delay_mins",
-                hover_name="weather",
+                title="Impact of Weather on Vehicle Speed",
+                labels={
+                    "condition_only": "Weather Condition",
+                    "speed_kmh": "Speed (km/h)",
+                },
                 color_discrete_map={
-                    "Clear": "#00d2ff",  # Bright blue for clear
-                    "Cloudy": "#9e9e9e",  # Grey for clouds
-                    "Rainy": "#0047b3",  # Deep blue/purple for rain
+                    "Clear": "#00d2ff",  # Bright blue
+                    "Cloudy": "#9e9e9e",  # Grey
+                    "Rainy": "#0047b3",  # Deep blue/purple
+                    "Unknown Weather": "#ffffff",  # In case of missing data
                 },
                 template="plotly_dark",
+                points="all",  # Shows the individual data points subtly behind the box
             )
+
+            # Make it look sleek
+            fig_speed.update_layout(showlegend=False)
+            fig_speed.update_traces(
+                marker=dict(opacity=0.4)
+            )  # Softens the background points
+
             st.plotly_chart(fig_speed, use_container_width=True)
 
         with col2:
