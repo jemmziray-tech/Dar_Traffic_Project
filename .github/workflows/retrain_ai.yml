@@ -2,8 +2,8 @@ name: Scheduled AI Retraining
 
 on:
   schedule:
-    # Runs at 00:00 every Monday (UTC)
-    - cron: "0 0 * * 1"
+    # Runs at 00:00 every day (UTC)
+    - cron: '0 0 * * *'
   workflow_dispatch: # Allows you to run it manually for testing
 
 jobs:
