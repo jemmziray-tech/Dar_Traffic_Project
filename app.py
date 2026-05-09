@@ -206,48 +206,49 @@ if not df.empty:
 
     st.markdown("---")
 
-        # --- ECONOMIC IMPACT CALCULATOR ---
-        st.subheader(":material/payments: Economic Impact of Congestion")
-        
-        # Economic Assumptions (TZS)
-        COST_PER_MINUTE_PER_CAR = 101 # 50 TZS Time + 51 TZS Fuel
-        ASSUMED_CARS_PER_NODE = 500   # Estimated traffic volume per road
-        
-        # Calculate the financial drain
-        total_wasted_tzs = total_delay * COST_PER_MINUTE_PER_CAR * ASSUMED_CARS_PER_NODE
-        
-        # Format the number to look like beautiful currency (e.g., 1.2M TZS)
-        if total_wasted_tzs >= 1000000:
-            formatted_cost = f"{total_wasted_tzs / 1000000:.1f}M TZS"
-        elif total_wasted_tzs >= 1000:
-            formatted_cost = f"{total_wasted_tzs / 1000:.1f}K TZS"
-        else:
-            formatted_cost = f"{total_wasted_tzs:,.0f} TZS"
-        
-        eco1, eco2, eco3 = st.columns(3)
-        
-        with eco1:
-            st.metric(
-                label="Estimated Capital Lost (Live)", 
-                value=formatted_cost, 
-                delta="Burning fuel & lost wages", 
-                delta_color="inverse"
+    # --- ECONOMIC IMPACT CALCULATOR ---
+    st.subheader(":material/payments: Economic Impact of Congestion")
+
+    # Economic Assumptions (TZS)
+    COST_PER_MINUTE_PER_CAR = 101  # 50 TZS Time + 51 TZS Fuel
+    ASSUMED_CARS_PER_NODE = 500  # Estimated traffic volume per road
+
+    # Calculate the financial drain
+    total_wasted_tzs = total_delay * COST_PER_MINUTE_PER_CAR * ASSUMED_CARS_PER_NODE
+
+    # Format the number to look like beautiful currency (e.g., 1.2M TZS)
+    if total_wasted_tzs >= 1000000:
+        formatted_cost = f"{total_wasted_tzs / 1000000:.1f}M TZS"
+    elif total_wasted_tzs >= 1000:
+        formatted_cost = f"{total_wasted_tzs / 1000:.1f}K TZS"
+    else:
+        formatted_cost = f"{total_wasted_tzs:,.0f} TZS"
+
+    eco1, eco2, eco3 = st.columns(3)
+
+    with eco1:
+        st.metric(
+            label="Estimated Capital Lost (Live)",
+            value=formatted_cost,
+            delta="Burning fuel & lost wages",
+            delta_color="inverse",
+        )
+    with eco2:
+        # Just a fun metric to show what that money could have bought
+        liters_wasted = total_delay * 0.016 * ASSUMED_CARS_PER_NODE
+        st.metric(
+            label="Total Fuel Wasted",
+            value=f"{liters_wasted:,.0f} Liters",
+            delta="Idle consumption",
+            delta_color="inverse",
+        )
+    with eco3:
+        with st.expander("How is this calculated?"):
+            st.caption(
+                "We assume an average fuel burn of 1L/hr and a median wage value of 3,000 TZS/hr per vehicle. Multiplied by an estimated volume of 500 cars per tracked intersection."
             )
-        with eco2:
-            # Just a fun metric to show what that money could have bought
-            liters_wasted = (total_delay * 0.016 * ASSUMED_CARS_PER_NODE)
-            st.metric(
-                label="Total Fuel Wasted", 
-                value=f"{liters_wasted:,.0f} Liters",
-                delta="Idle consumption",
-                delta_color="inverse"
-            )
-        with eco3:
-            with st.expander("How is this calculated?"):
-                st.caption("We assume an average fuel burn of 1L/hr and a median wage value of 3,000 TZS/hr per vehicle. Multiplied by an estimated volume of 500 cars per tracked intersection.")
-        
-        st.markdown("---")
-    
+
+    st.markdown("---")
 
     # --- ADVANCED INTELLIGENCE & AI PREDICTION ---
     col_ai_left, col_ai_right = st.columns([1, 2])
