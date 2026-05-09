@@ -4,13 +4,13 @@ on:
   schedule:
     # Runs at 00:00 every day (UTC)
     - cron: '0 0 * * *'
-  workflow_dispatch: # Allows you to run it manually for testing
+  workflow_dispatch: # Allows you to run it manually for testing by clicking a button in GitHub
 
 jobs:
   retrain:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -20,7 +20,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas scikit-learn joblib firebase-admin google-cloud-firestore
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Create Firebase Key File
         run: |
