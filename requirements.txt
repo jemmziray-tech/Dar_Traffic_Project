@@ -10,3 +10,5 @@ pydeck>=0.9.0
 scikit-learn>=1.4.0
 google-generativeai>=0.8.0
 numpy>=1.26.0
+pytz
+joblib
