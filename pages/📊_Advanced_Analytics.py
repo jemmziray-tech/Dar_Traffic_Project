@@ -35,7 +35,7 @@ def load_historical_data():
     docs = (
         db.collection("traffic_history")
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
-        .limit(2000)
+        .limit(35000)
         .stream()
     )
 
