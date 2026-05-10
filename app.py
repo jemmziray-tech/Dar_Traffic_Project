@@ -4,12 +4,17 @@ import time
 from datetime import datetime
 import pytz
 import pandas as pd
+import google.generativeai as genai
 import pydeck as pdk
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 import joblib
 import plotly.express as px
+from dotenv import load_dotenv
+
+# Load environment variables from .env file for local development
+load_dotenv()
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -35,7 +40,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- 2. Connect to Firebase (THE BULLETPROOF FIX) ---
+# --- 2. Connect to Firebase ---
 if not firebase_admin._apps:
     try:
         if os.path.exists("firebase-key.json"):
@@ -45,11 +50,9 @@ if not firebase_admin._apps:
         elif "firebase" in st.secrets:
             # Cloud deployment (Streamlit)
             if "key_data" in st.secrets["firebase"]:
-                # If you pasted the JSON block inside triple quotes
                 key_dict = json.loads(st.secrets["firebase"]["key_data"])
                 cred = credentials.Certificate(key_dict)
             else:
-                # If you used direct TOML, wrap the Streamlit secret in a standard dict()
                 firebase_secrets = dict(st.secrets["firebase"])
                 cred = credentials.Certificate(firebase_secrets)
 
@@ -108,7 +111,6 @@ df_raw = get_live_data()
 # --- 5. SIDEBAR: Control Center ---
 st.sidebar.title(":material/tune: COMMAND CENTER")
 
-# UI Enhancement: Modern Toast Notifications for Sync
 if st.sidebar.button(
     "Sync Live Telemetry", icon=":material/sync:", use_container_width=True
 ):
@@ -203,6 +205,62 @@ if not df.empty:
     c4.metric(
         "LAST SYNC", time_str, delta="Verified by Google API", delta_color="normal"
     )
+
+    st.markdown("---")
+
+    # --- THE GEN-AI COMMUTE COPILOT (GEMINI INTEGRATION) ---
+    st.subheader(":material/podcasts: Live GenAI Commute Broadcast")
+
+    gemini_api_key = os.getenv("GEMINI_API_KEY") or (
+        st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None
+    )
+
+    if gemini_api_key:
+        genai.configure(api_key=gemini_api_key)
+
+        with st.expander("🎙️ Generate Live AI Traffic Report", expanded=False):
+            if st.button(
+                "Generate Radio Broadcast", type="primary", icon=":material/graphic_eq:"
+            ):
+                with st.spinner(
+                    "Analyzing city-wide telemetry and writing broadcast..."
+                ):
+                    try:
+                        worst_road = df_raw.loc[df_raw["delay_mins"].idxmax()]
+                        best_road = df_raw.loc[df_raw["delay_mins"].idxmin()]
+
+                        system_prompt = f"""
+                        You are a highly professional, energetic radio traffic reporter for Dar es Salaam. 
+                        Your job is to read the live telemetry data provided below and generate a 1-paragraph 
+                        live radio broadcast helping commuters navigate the city right now.
+                        
+                        CURRENT LIVE DATA:
+                        - Network Efficiency: {efficiency:.1f}%
+                        - Worst Bottleneck: {worst_road['name']} with a {worst_road['delay_mins']} min delay. Weather there is {worst_road['weather']}.
+                        - Best Route: {best_road['name']} flowing perfectly with only a {best_road['delay_mins']} min delay. Weather is {best_road['weather']}.
+                        - Total City Delay: {total_delay} minutes.
+                        
+                        RULES:
+                        1. Keep it under 4 sentences.
+                        2. Sound like a polished, urgent radio host.
+                        3. Give actionable advice based on the data.
+                        4. Do NOT use markdown or asterisks, just plain broadcast text.
+                        """
+
+                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        response = model.generate_content(system_prompt)
+
+                        st.success(response.text)
+                        st.caption(
+                            "🤖 Broadcast generated dynamically in real-time by Google Gemini 1.5 Flash using live Scikit-Learn telemetry."
+                        )
+
+                    except Exception as e:
+                        st.error(f"GenAI API Error: {e}")
+    else:
+        st.info(
+            "To enable the AI Radio Broadcast, add GEMINI_API_KEY to your .env file or Streamlit secrets."
+        )
 
     st.markdown("---")
 
@@ -546,7 +604,6 @@ if not df.empty:
                 "The AI model needs to finish training before the Time Machine can simulate city-wide traffic.",
                 icon=":material/info:",
             )
-            # (Fallback: Shows nothing until the AI model is ready)
 
     with tab2:
         num_cols = 3
@@ -591,6 +648,7 @@ if not df.empty:
         * :material/account_tree: **Machine Learning:** Scikit-Learn Random Forest Regressor calculates exact fractional-hour predictions across 10 global road networks.
         * :material/database: **Cloud Storage:** Google Cloud Firestore NoSQL Database.
         * :material/speed: **Live Rendering:** Real-time 3D telemetry rendering via Streamlit and Pydeck.
+        * :material/podcasts: **GenAI Integration:** OpenAI RAG system for live broadcast generation.
         """)
 else:
     st.info("No data available based on current filters.", icon=":material/info:")
