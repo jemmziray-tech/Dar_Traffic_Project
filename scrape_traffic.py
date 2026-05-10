@@ -8,6 +8,7 @@ import googlemaps
 import firebase_admin
 from firebase_admin import credentials, firestore
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field, ValidationError
 
 # --- Configure Enterprise Logging ---
 logging.basicConfig(
@@ -37,8 +38,29 @@ db = firestore.client()
 GOOGLE_API_KEY = os.getenv("MAPS_API_KEY")
 gmaps = None
 
+
 # ---------------------------------------------------------
-# 2. BOTTLENECK CONFIGURATION
+# 2. DATA CONTRACTS (PYDANTIC SCHEMA)
+# ---------------------------------------------------------
+class TrafficSchema(BaseModel):
+    """Strict data validation rules to prevent garbage data from entering Firebase."""
+
+    road_id: str
+    name: str
+    normal_mins: int = Field(
+        ..., ge=0, description="Normal traffic time cannot be negative"
+    )
+    live_mins: int = Field(
+        ..., ge=0, description="Live traffic time cannot be negative"
+    )
+    delay_mins: int = Field(..., ge=0, description="Delay cannot be negative")
+    speed_kmh: float = Field(..., ge=0.0, description="Speed must be a positive float")
+    status: str
+    weather: str
+
+
+# ---------------------------------------------------------
+# 3. BOTTLENECK CONFIGURATION
 # ---------------------------------------------------------
 ROADS = [
     {
@@ -115,7 +137,7 @@ ROADS = [
 
 
 # ---------------------------------------------------------
-# 3. WEATHER ENGINE
+# 4. WEATHER ENGINE
 # ---------------------------------------------------------
 def get_weather():
     url = "https://api.open-meteo.com/v1/forecast?latitude=-6.7978&longitude=39.2201&current_weather=true"
@@ -131,7 +153,7 @@ def get_weather():
 
 
 # ---------------------------------------------------------
-# 4. TRAFFIC ENGINE & FIREBASE SYNC
+# 5. TRAFFIC ENGINE & FIREBASE SYNC
 # ---------------------------------------------------------
 def update_smart_city(road, weather):
     try:
@@ -157,7 +179,7 @@ def update_smart_city(road, weather):
             "Smooth" if delay_m <= 3 else "Moderate" if delay_m <= 7 else "Heavy Jam"
         )
 
-        traffic_data = {
+        raw_data = {
             "road_id": road["id"],
             "name": road["name"],
             "normal_mins": norm_m,
@@ -166,25 +188,35 @@ def update_smart_city(road, weather):
             "speed_kmh": speed,
             "status": status,
             "weather": weather,
-            "timestamp": firestore.SERVER_TIMESTAMP,
         }
 
+        # 🛡️ THE PYDANTIC BOUNCER: Validate the data before it touches the database
+        validated_data = TrafficSchema(**raw_data).model_dump()
+
+        # Once validated, append the Firestore timestamp (which changes dynamically)
+        validated_data["timestamp"] = firestore.SERVER_TIMESTAMP
+
         # HOT STORAGE
-        db.collection("live_traffic").document(road["id"]).set(traffic_data)
+        db.collection("live_traffic").document(road["id"]).set(validated_data)
         # COLD STORAGE
-        db.collection("traffic_history").add(traffic_data)
+        db.collection("traffic_history").add(validated_data)
 
         logging.info(f"Firebase Synced | {road['name']}: {status} (+{delay_m}m)")
 
+    except ValidationError as e:
+        # If Pydantic catches a bad data type, it throws a ValidationError to stop the upload
+        logging.error(
+            f"❌ DATA CONTRACT FAILED for {road['name']}! Bad data blocked from DB:\n{e}"
+        )
     except Exception as e:
         logging.error(f"Error syncing {road['name']}: {e}")
 
 
 # ---------------------------------------------------------
-# 5. MAIN EXECUTION (CONCURRENT UPGRADE)
+# 6. MAIN EXECUTION (CONCURRENT UPGRADE)
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    logging.info("Booting Smart City Engine...")
+    logging.info("Booting Smart City Engine with Pydantic Validation...")
 
     if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not GOOGLE_API_KEY:
         logging.error(
@@ -198,14 +230,10 @@ if __name__ == "__main__":
             "Initiating high-speed concurrent scraping (ThreadPoolExecutor)..."
         )
 
-        # 🚀 THE SENIOR UPGRADE: Scraping all 10 roads simultaneously!
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            # We map the 'update_smart_city' function to every road in the ROADS list at the same time
             futures = [
                 executor.submit(update_smart_city, r, current_weather) for r in ROADS
             ]
-
-            # Wait for all threads to finish their job
             concurrent.futures.wait(futures)
 
         logging.info("Sync Complete!")

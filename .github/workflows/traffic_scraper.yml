@@ -26,6 +26,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r scraper_requirements.txt
 
+      - name: Run Unit Tests (Pytest)
+        run: pytest tests/
+
       - name: Run Scraper
         # We pass the secrets directly to the Python script in memory (No more echo!)
         env:
