@@ -12,3 +12,4 @@ scikit-learn
 joblib
 google-generativeai
 python-dotenv
+numpy>=1.26.0
