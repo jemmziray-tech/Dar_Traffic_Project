@@ -11,4 +11,4 @@ pydeck
 scikit-learn
 joblib
 google-generativeai
-numpy>=1.21.0
+numpy
