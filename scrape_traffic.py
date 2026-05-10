@@ -188,7 +188,7 @@ def update_smart_city(road, weather):
 if __name__ == "__main__":
     logging.info("Booting Smart City Engine...")
 
-    if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not GOOGLE_API_KEY:
+    if MAPS_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not MAPS_API_KEY:
         logging.error("You forgot to configure your Google API Key in the .env file!")
     else:
         current_weather = get_weather()
