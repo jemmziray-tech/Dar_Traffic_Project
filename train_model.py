@@ -1,5 +1,6 @@
 import os
 import csv
+import json
 from datetime import datetime
 import pandas as pd
 import joblib
@@ -10,7 +11,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, r2_score
 
 print("🚀 Starting Global AI Training Pipeline (10 Roads | 15-Min Precision)...")
 
@@ -30,8 +31,21 @@ TARGET_ROADS = [
 
 # --- 2. Connect to Firebase & Fetch Data ---
 print("📥 Fetching historical data from Firebase...")
+
+# Safely handle Cloud vs Local authentication
+firebase_secret = os.getenv("FIREBASE_KEY_JSON")
+
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase-key.json")
+    if firebase_secret:
+        # Running in GitHub Actions: Read the raw JSON text from the secret
+        print("Authenticating via Cloud Secrets...")
+        cred_dict = json.loads(firebase_secret)
+        cred = credentials.Certificate(cred_dict)
+    else:
+        # Running locally on Laptop: Read the physical file
+        print("Authenticating via local JSON file...")
+        cred = credentials.Certificate("firebase-key.json")
+
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
@@ -94,9 +108,12 @@ model_pipeline.fit(X_train, y_train)
 
 predictions = model_pipeline.predict(X_test)
 mae = mean_absolute_error(y_test, predictions)
+r2 = r2_score(y_test, predictions)
+
 print(
     f"🎯 Global Accuracy: Predictions across all 10 roads are typically off by {mae:.2f} minutes."
 )
+print(f"🎯 Model R² Score: {r2:.2f}")
 
 joblib.dump(model_pipeline, "traffic_model.pkl")
 print("💾 Global Model successfully saved as 'traffic_model.pkl'!")
@@ -108,10 +125,12 @@ file_exists = os.path.isfile(metrics_file)
 
 with open(metrics_file, mode="a", newline="", encoding="utf-8") as file:
     writer = csv.writer(file)
-    if not file_exists:
-        writer.writerow(["Date", "Total_Rows_Trained", "MAE_Minutes"])
 
-    today_date = datetime.now().strftime("%Y-%m-%d")
-    writer.writerow([today_date, len(df), round(mae, 2)])
+    # Using YOUR exact column format, just appending R2_Score at the end!
+    if not file_exists:
+        writer.writerow(["Date", "Total_Rows_Trained", "MAE_Minutes", "R2_Score"])
+
+    today_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    writer.writerow([today_date, len(df), round(mae, 2), round(r2, 2)])
 
 print("✅ Metrics logged successfully!")

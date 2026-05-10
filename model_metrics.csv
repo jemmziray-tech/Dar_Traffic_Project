@@ -1,4 +1,2 @@
-Date,Total_Rows_Trained,MAE_Minutes
-2026-05-05,1864,0.3
-2026-05-09,4234,0.27
-2026-05-10,4744,0.26
+Date,Total_Rows_Trained,MAE_Minutes,R2_Score
+2026-05-10 19:34:19,5084,0.3,0.56

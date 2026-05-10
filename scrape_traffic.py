@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import concurrent.futures
 from datetime import datetime
 import requests
 import googlemaps
@@ -18,16 +19,13 @@ load_dotenv()
 # ---------------------------------------------------------
 # 1. CLOUD INITIALIZATION
 # ---------------------------------------------------------
-# Check for GitHub Secrets first, fallback to local file
 firebase_secret = os.getenv("FIREBASE_KEY_JSON")
 
 if firebase_secret:
-    # Running in GitHub Actions: Read the raw JSON text from the secret
     logging.info("Authenticating via Cloud Secrets...")
     cred_dict = json.loads(firebase_secret)
     cred = credentials.Certificate(cred_dict)
 else:
-    # Running locally on Laptop: Read the physical file
     logging.info("Authenticating via local JSON file...")
     cred = credentials.Certificate("firebase-key.json")
 
@@ -36,7 +34,6 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# Grab the key from environment, DO NOT initialize the client here
 GOOGLE_API_KEY = os.getenv("MAPS_API_KEY")
 gmaps = None
 
@@ -96,22 +93,22 @@ ROADS = [
     {
         "id": "sam_nujoma",
         "name": "Sam Nujoma Rd (Mwenge-Ubungo)",
-        "start": "-6.7755,39.2435", 
-        "end": "-6.7975,39.2205",  
+        "start": "-6.7755,39.2435",
+        "end": "-6.7975,39.2205",
         "dist": 4.2,
     },
     {
         "id": "uhuru_street",
         "name": "Uhuru Street (Ilala-Town)",
-        "start": "-6.8220,39.2550", 
-        "end": "-6.8155,39.2820",  
+        "start": "-6.8220,39.2550",
+        "end": "-6.8155,39.2820",
         "dist": 3.2,
     },
     {
         "id": "kariakoo",
         "name": "Kariakoo Market Grid",
-        "start": "-6.8115,39.2725", 
-        "end": "-6.8210,39.2750",  
+        "start": "-6.8115,39.2725",
+        "end": "-6.8210,39.2750",
         "dist": 1.1,
     },
 ]
@@ -184,18 +181,31 @@ def update_smart_city(road, weather):
 
 
 # ---------------------------------------------------------
-# 5. MAIN EXECUTION
+# 5. MAIN EXECUTION (CONCURRENT UPGRADE)
 # ---------------------------------------------------------
 if __name__ == "__main__":
     logging.info("Booting Smart City Engine...")
 
     if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not GOOGLE_API_KEY:
-        logging.error("You forgot to configure your Google API Key in the environment or GitHub Secrets!")
+        logging.error(
+            "You forgot to configure your Google API Key in the environment or GitHub Secrets!"
+        )
     else:
-        # Safe Initialization: The client is only created if the key exists
         gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
-        
         current_weather = get_weather()
-        for r in ROADS:
-            update_smart_city(r, current_weather)
+
+        logging.info(
+            "Initiating high-speed concurrent scraping (ThreadPoolExecutor)..."
+        )
+
+        # 🚀 THE SENIOR UPGRADE: Scraping all 10 roads simultaneously!
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            # We map the 'update_smart_city' function to every road in the ROADS list at the same time
+            futures = [
+                executor.submit(update_smart_city, r, current_weather) for r in ROADS
+            ]
+
+            # Wait for all threads to finish their job
+            concurrent.futures.wait(futures)
+
         logging.info("Sync Complete!")
