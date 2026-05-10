@@ -16,10 +16,10 @@ logging.basicConfig(
 load_dotenv()
 
 # ---------------------------------------------------------
-# 1. CLOUD INITIALIZATION (THE FIX)
+# 1. CLOUD INITIALIZATION
 # ---------------------------------------------------------
 # Check for GitHub Secrets first, fallback to local file
-firebase_secret = os.getenv("FIREBASE_KEY_JSON") or os.getenv("FIREBASE_CREDENTIALS")
+firebase_secret = os.getenv("FIREBASE_KEY_JSON")
 
 if firebase_secret:
     # Running in GitHub Actions: Read the raw JSON text from the secret
@@ -36,8 +36,9 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
+# Grab the key from environment, DO NOT initialize the client here
 GOOGLE_API_KEY = os.getenv("MAPS_API_KEY")
-gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
+gmaps = None
 
 # ---------------------------------------------------------
 # 2. BOTTLENECK CONFIGURATION
@@ -188,9 +189,12 @@ def update_smart_city(road, weather):
 if __name__ == "__main__":
     logging.info("Booting Smart City Engine...")
 
-    if MAPS_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not MAPS_API_KEY:
-        logging.error("You forgot to configure your Google API Key in the .env file!")
+    if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not GOOGLE_API_KEY:
+        logging.error("You forgot to configure your Google API Key in the environment or GitHub Secrets!")
     else:
+        # Safe Initialization: The client is only created if the key exists
+        gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
+        
         current_weather = get_weather()
         for r in ROADS:
             update_smart_city(r, current_weather)
