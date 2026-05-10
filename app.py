@@ -247,12 +247,12 @@ if not df.empty:
                         4. Do NOT use markdown or asterisks, just plain broadcast text.
                         """
 
-                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        model = genai.GenerativeModel("gemini-2.5-flash")
                         response = model.generate_content(system_prompt)
 
                         st.success(response.text)
                         st.caption(
-                            "🤖 Broadcast generated dynamically in real-time by Google Gemini 1.5 Flash using live Scikit-Learn telemetry."
+                            "🤖 Broadcast generated dynamically in real-time by Google Gemini 2.5 Flash using live Scikit-Learn telemetry."
                         )
 
                     except Exception as e:
