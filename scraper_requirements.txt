@@ -1,0 +1,4 @@
+requests
+googlemaps
+firebase-admin
+python-dotenv
