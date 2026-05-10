@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from datetime import datetime
 import requests
@@ -15,10 +16,24 @@ logging.basicConfig(
 load_dotenv()
 
 # ---------------------------------------------------------
-# 1. CLOUD INITIALIZATION
+# 1. CLOUD INITIALIZATION (THE FIX)
 # ---------------------------------------------------------
-cred = credentials.Certificate("firebase-key.json")
-firebase_admin.initialize_app(cred)
+# Check for GitHub Secrets first, fallback to local file
+firebase_secret = os.getenv("FIREBASE_KEY") or os.getenv("FIREBASE_CREDENTIALS")
+
+if firebase_secret:
+    # Running in GitHub Actions: Read the raw JSON text from the secret
+    logging.info("Authenticating via Cloud Secrets...")
+    cred_dict = json.loads(firebase_secret)
+    cred = credentials.Certificate(cred_dict)
+else:
+    # Running locally on Laptop: Read the physical file
+    logging.info("Authenticating via local JSON file...")
+    cred = credentials.Certificate("firebase-key.json")
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
+
 db = firestore.client()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
@@ -80,22 +95,22 @@ ROADS = [
     {
         "id": "sam_nujoma",
         "name": "Sam Nujoma Rd (Mwenge-Ubungo)",
-        "start": "-6.7755,39.2435", # Mwenge side
-        "end": "-6.7975,39.2205",   # Ubungo side
+        "start": "-6.7755,39.2435", 
+        "end": "-6.7975,39.2205",  
         "dist": 4.2,
     },
     {
         "id": "uhuru_street",
         "name": "Uhuru Street (Ilala-Town)",
-        "start": "-6.8220,39.2550", # Ilala Boma
-        "end": "-6.8155,39.2820",   # City Centre / Clock Tower
+        "start": "-6.8220,39.2550", 
+        "end": "-6.8155,39.2820",  
         "dist": 3.2,
     },
     {
         "id": "kariakoo",
         "name": "Kariakoo Market Grid",
-        "start": "-6.8115,39.2725", # Msimbazi / Fire
-        "end": "-6.8210,39.2750",   # Kariakoo Roundabout
+        "start": "-6.8115,39.2725", 
+        "end": "-6.8210,39.2750",  
         "dist": 1.1,
     },
 ]
@@ -145,7 +160,7 @@ def update_smart_city(road, weather):
         )
 
         traffic_data = {
-            "road_id": road["id"],  # Fixed NameError bug here!
+            "road_id": road["id"],
             "name": road["name"],
             "normal_mins": norm_m,
             "live_mins": live_m,
