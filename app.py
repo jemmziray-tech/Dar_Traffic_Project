@@ -395,38 +395,158 @@ if not df.empty:
     )
 
     with tab1:
-        tooltip = {
-            "html": "<b>{name}</b><br/>Speed: {speed_kmh} km/h<br/>Status: {status}<br/>Delay: {delay_mins} mins",
-            "style": {
-                "backgroundColor": "#1E1E1E",
-                "color": "white",
-                "border": "1px solid #333",
-                "borderRadius": "4px",
-            },
-        }
-        view_state = pdk.ViewState(
-            latitude=-6.81, longitude=39.25, zoom=11.5, pitch=45, bearing=0
+        st.subheader(":material/3d_rotation: 4D Geospatial Time Machine")
+        st.caption(
+            "Watch the city's traffic pulse throughout the day. Powered by your Random Forest AI Model."
         )
-        layer = pdk.Layer(
-            "ColumnLayer",
-            df,
-            get_position=["lon", "lat"],
-            get_elevation="elevation_val",
-            elevation_scale=150,
-            radius=250,
-            get_fill_color="color",
-            extruded=True,
-            pickable=True,
-            auto_highlight=True,
-        )
-        st.pydeck_chart(
-            pdk.Deck(
-                layers=[layer],
-                initial_view_state=view_state,
-                tooltip=tooltip,
-                map_style="dark",
+
+        if os.path.exists("traffic_model.pkl"):
+            ai_model = joblib.load("traffic_model.pkl")
+
+            # --- 1. Simulation Controls ---
+            sim_c1, sim_c2, sim_c3 = st.columns([2, 2, 1])
+            with sim_c1:
+                sim_day = st.selectbox(
+                    "Simulation Day",
+                    [
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday",
+                        "Saturday",
+                        "Sunday",
+                    ],
+                    index=datetime.now(tz).weekday(),
+                    key="sim_day",
+                )
+            with sim_c2:
+                sim_weather = st.selectbox(
+                    "Simulation Weather",
+                    ["Clear", "Rainy", "Cloudy"],
+                    key="sim_weather",
+                )
+            with sim_c3:
+                st.write("")  # Spacing alignment
+                st.write("")
+                play_animation = st.button(
+                    "▶ Play Animation", use_container_width=True, type="primary"
+                )
+
+            slider_hour = st.slider(
+                "Manual Time Travel (Hour)",
+                min_value=6,
+                max_value=23,
+                value=8,
+                step=1,
+                key="sim_hour",
             )
-        )
+
+            # --- 2. The AI Rendering Engine ---
+            def generate_pydeck_map(target_hour):
+                sim_data = []
+                for r_id, coords in ROAD_COORDS.items():
+                    # Feed the AI the specific hour, day, and weather for this specific road
+                    pred_df = pd.DataFrame(
+                        {
+                            "road_id": [r_id],
+                            "Hour": [target_hour],
+                            "Day": [sim_day],
+                            "Condition": [sim_weather],
+                        }
+                    )
+                    pred_delay = ai_model.predict(pred_df)[0]
+
+                    # Dynamically adjust colors based on the AI's prediction
+                    if pred_delay < 1.0:
+                        color = [40, 167, 69, 200]  # Green (Smooth)
+                        status = "Smooth"
+                    elif pred_delay < 2.5:
+                        color = [255, 193, 7, 220]  # Yellow (Moderate)
+                        status = "Moderate"
+                    else:
+                        color = [220, 53, 69, 255]  # Red (Heavy Jam)
+                        status = "Heavy Jam"
+
+                    sim_data.append(
+                        {
+                            "name": r_id.replace("_", " ").title(),
+                            "lat": coords["lat"],
+                            "lon": coords["lon"],
+                            "delay_mins": round(pred_delay, 1),
+                            "status": status,
+                            "color": color,
+                            "elevation_val": max(
+                                pred_delay * 1.5, 0.5
+                            ),  # Scale height for visual impact
+                        }
+                    )
+
+                sim_df = pd.DataFrame(sim_data)
+
+                # Build the 3D Map
+                tooltip = {
+                    "html": "<b>{name}</b><br/>Simulated Time: "
+                    + f"{int(target_hour):02d}:00"
+                    + "<br/>Status: {status}<br/>Predicted Delay: {delay_mins} mins",
+                    "style": {
+                        "backgroundColor": "#1E1E1E",
+                        "color": "white",
+                        "border": "1px solid #333",
+                        "borderRadius": "4px",
+                    },
+                }
+                view_state = pdk.ViewState(
+                    latitude=-6.81, longitude=39.25, zoom=11.5, pitch=50, bearing=0
+                )
+                layer = pdk.Layer(
+                    "ColumnLayer",
+                    sim_df,
+                    get_position=["lon", "lat"],
+                    get_elevation="elevation_val",
+                    elevation_scale=150,
+                    radius=250,
+                    get_fill_color="color",
+                    extruded=True,
+                    pickable=True,
+                    auto_highlight=True,
+                )
+                return pdk.Deck(
+                    layers=[layer],
+                    initial_view_state=view_state,
+                    tooltip=tooltip,
+                    map_style="dark",
+                )
+
+            # --- 3. The Animation Loop ---
+            map_placeholder = st.empty()  # Creates a blank container we can overwrite
+
+            if play_animation:
+                # Loop through the day and overwrite the map every 0.6 seconds
+                for h in range(6, 24):
+                    with map_placeholder.container():
+                        st.markdown(
+                            f"<h4 style='text-align: center; color: #00d2ff;'>⏰ Simulating Time: {h:02d}:00</h4>",
+                            unsafe_allow_html=True,
+                        )
+                        st.pydeck_chart(generate_pydeck_map(h))
+                    time.sleep(0.6)
+                st.toast("Simulation Complete!", icon="✅")
+            else:
+                # Static render based on where the user drags the slider
+                with map_placeholder.container():
+                    st.markdown(
+                        f"<h4 style='text-align: center; color: #9e9e9e;'>⏰ Time: {slider_hour:02d}:00</h4>",
+                        unsafe_allow_html=True,
+                    )
+                    st.pydeck_chart(generate_pydeck_map(slider_hour))
+
+        else:
+            st.info(
+                "The AI model needs to finish training before the Time Machine can simulate city-wide traffic.",
+                icon=":material/info:",
+            )
+            # (Fallback: Shows nothing until the AI model is ready)
 
     with tab2:
         num_cols = 3
