@@ -11,5 +11,4 @@ pydeck
 scikit-learn
 joblib
 google-generativeai
-python-dotenv
-numpy>=1.26.0
+numpy>=1.21.0,<2.0.0
