@@ -3,7 +3,7 @@ googlemaps
 firebase-admin
 google-cloud-firestore
 python-dotenv
-streamlit
+streamlit>=1.30.0
 pandas
 plotly
 pytz
@@ -11,7 +11,4 @@ pydeck
 scikit-learn
 joblib
 google-generativeai
-numpy
-openmeteo-requests
-requests-cache
-retry-requests
+numpy>=1.26.0
