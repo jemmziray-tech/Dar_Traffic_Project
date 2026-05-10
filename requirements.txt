@@ -12,3 +12,6 @@ scikit-learn
 joblib
 google-generativeai
 numpy
+openmeteo-requests
+requests-cache
+retry-requests
