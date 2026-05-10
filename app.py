@@ -230,7 +230,7 @@ if not df.empty:
                         4. Do NOT use markdown or asterisks, just plain broadcast text.
                         """
 
-                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        model = genai.GenerativeModel("gemini-2.5-flash")
                         response = model.generate_content(system_prompt)
 
                         st.success(response.text)
