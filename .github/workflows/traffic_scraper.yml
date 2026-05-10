@@ -1,13 +1,11 @@
 name: Traffic Scraper Automation
 
 on:
-  # 1. We removed the unreliable 'schedule' cron job.
-  # 2. NEW: We added 'repository_dispatch'. This opens a secure "door"
-  # allowing external services (like Google Cloud) to trigger this script instantly.
+  # Triggered by your Google Cloud Scheduler every 15 minutes!
   repository_dispatch:
     types: [trigger-scraper]
 
-  # Keeps the manual button in the GitHub UI just in case you need to test it!
+  # Keeps the manual button in the GitHub UI just in case
   workflow_dispatch:
 
 jobs:
@@ -21,16 +19,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          cache: "pip" # Pro-tip: Caches dependencies to make the bot run even faster!
+          cache: "pip" # Great job keeping this, it makes it much faster!
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r scraper_requirements.txt
 
       - name: Run Scraper
+        # We pass the secrets directly to the Python script in memory (No more echo!)
         env:
-          FIREBASE_KEY_DATA: ${{ secrets.FIREBASE_KEY_JSON }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
-          echo "$FIREBASE_KEY_DATA" > firebase-key.json
           python scrape_traffic.py
