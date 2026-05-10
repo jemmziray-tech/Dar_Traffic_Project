@@ -1,7 +1,9 @@
 # <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6a6/512.gif" width="35" align="center"> Dar es Salaam Smart City: Traffic & Weather Engine
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/traffic_scraper.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=Scraper%20Status)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/retrainai.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=AI%20Retraining)
 ![Firebase](https://img.shields.io/badge/Database-Firebase%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
+![Google Gemini](https://img.shields.io/badge/GenAI-Google%20Gemini-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white)
 ![Python](https://img.shields.io/badge/Engine-Python%203.10-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Dashboard-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
 
@@ -11,30 +13,31 @@
 
 An automated, cloud-native **Data Engineering Pipeline & Intelligence Dashboard** that monitors real-time traffic congestion and meteorological conditions across major arterial corridors in **Dar es Salaam, Tanzania**.
 
-By synchronizing high-resolution time-series data from Google Maps and Weather APIs into a NoSQL Cloud Database, this project builds a "Digital Twin" of the city's mobility patterns. The data is visualized in a live, 3D spatial dashboard, laying the foundation for predictive analysis of urban bottlenecks.
+By synchronizing high-resolution time-series data from Google Maps and Weather APIs into a NoSQL Cloud Database, this project builds a "Digital Twin" of the city's mobility patterns. The system features a **Gemini 1.5-powered Radio Broadcast** that generates live commute reports using real-time telemetry.
 
 ---
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e1/512.gif" width="28" align="center"> Live Architecture Flow
+## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e1/512.gif" width="28" align="center"> Optimized Cloud Architecture
 
-> _The system wakes up autonomously, processes data in the cloud, updates the global database, and serves it to a live web application._
+> _The system uses a decoupled, high-performance architecture to ensure the frontend, data ingestion, and AI training environments never conflict._
 
-1.  **Trigger:** GitHub Actions (Cron Schedule) wakes up a headless server.
-2.  **Ingestion:** Python engine queries **Google Maps Distance Matrix API** & **Open-Meteo API**.
-3.  **Processing:** Script calculates speed differentials, congestion severity, and normalizes timestamps.
-4.  **Storage:** Live data is pushed to **Google Cloud Firestore (Firebase)**.
-5.  **Analytics:** Historical snapshots are preserved for future Machine Learning training.
-6.  **Visualization:** **Streamlit Cloud** pulls live metrics and plots them on a 3D Pydeck geospatial map.
+1.  **Orchestration:** **Google Cloud Scheduler** sends a 15-minute heartbeat to GitHub.
+2.  **Decoupled Ingestion:** GitHub Actions uses a lightweight `scraper_requirements.txt` to run the Python engine instantly.
+3.  **Data Processing:** Engine queries **Google Maps Distance Matrix API** & **Open-Meteo API**, calculating speed differentials and congestion severity.
+4.  **Storage:** Live snapshots are pushed to **Google Cloud Firestore (Firebase)**.
+5.  **GenAI Intelligence:** **Google Gemini 1.5 Flash** analyzes city-wide telemetry to generate dynamic "Radio Broadcast" commute advice.
+6.  **Automated ML:** A separate `retrainai.yml` workflow crunches historical data weekly using Scikit-Learn to refine traffic predictions.
+7.  **Visualization:** **Streamlit Cloud** renders live 3D geospatial maps using `Pydeck`.
 
 ---
 
 ## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/2728/512.gif" width="28" align="center"> Key Intelligence Features
 
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f916/512.gif" width="22" align="center"> **100% Autonomous Pipeline:** Zero-infrastructure required. Data ingestion runs 24/7 via GitHub Actions.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f30d/512.gif" width="22" align="center"> **3D Spatial Mapping:** Real-time city congestion heatmap using `Pydeck` and coordinate mapping.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f697/512.gif" width="22" align="center"> **Multi-Node Monitoring:** Tracking critical bottlenecks including **Ubungo (Morogoro Rd)**, **Mwenge (Bagamoyo Rd)**, and **Tazara (Nyerere Rd)**.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f327/512.gif" width="22" align="center"> **Weather Correlation:** Cross-references traffic delays with precipitation and temperature to quantify the "Rain Effect" on Dar commute times.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f510/512.gif" width="22" align="center"> **Dual-Environment Security:** Implements Streamlit Secrets for cloud deployment and secure local JSON parsing for development.
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f916/512.gif" width="22" align="center"> **100% Autonomous Pipeline:** Powered by a 15-minute sync cycle controlled by Google Cloud.
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f399/512.gif" width="22" align="center"> **AI Radio Broadcast:** Dynamic commute reports generated by Google Gemini.
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f30d/512.gif" width="22" align="center"> **3D Geospatial Mapping:** Real-time city congestion heatmap using `Pydeck`.
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4b0/512.gif" width="22" align="center"> **Economic Impact Tracker:** Live calculation of fuel waste and capital loss (TZS) based on city delays.
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f510/512.gif" width="22" align="center"> **Enterprise Security:** Secure GitHub Secret vaulting and Streamlit Secrets management.
 
 ---
 
@@ -44,30 +47,28 @@ By synchronizing high-resolution time-series data from Google Maps and Weather A
   <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" />
   <img src="https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white" />
   <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white" />
-  <img src="https://img.shields.io/badge/Plotly-239120?style=for-the-badge&logo=plotly&logoColor=white" />
-  <img src="https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white" />
-  <img src="https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white" />
+  <img src="https://img.shields.io/badge/Google_Gemini-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white" />
+  <img src="https://img.shields.io/badge/Scikit_Learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" />
+  <img src="https://img.shields.io/badge/Github_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white" />
 </p>
 
 ---
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4be/512.gif" width="28" align="center"> Data Schema (NoSQL)
+## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4a1/512.gif" width="28" align="center"> Lessons from "Dependency Hell"
 
-| Data Point      | Key Description                            | Type      |
-| :-------------- | :----------------------------------------- | :-------- |
-| `road_id`       | Unique identifier for the city segment     | String    |
-| `delay_mins`    | Minutes lost relative to free-flow traffic | Integer   |
-| `avg_speed_kmh` | Real-time velocity of the traffic flow     | Float     |
-| `weather_desc`  | Current conditions (Temp / Rain / Sky)     | String    |
-| `sync_time`     | ISO-8601 Timestamp of cloud sync           | Timestamp |
+Building this project required overcoming several real-world engineering hurdles:
+1.  **Separation of Concerns:** Learned to use separate requirements files (`scraper_requirements.txt` vs `requirements.txt`) to bypass complex `pip` resolution errors.
+2.  **Environment Sync:** Solved `ValueError` crashes by explicitly bridging GitHub Secrets into the Actions YAML environment.
+3.  **Decoupled Orchestration:** Migrated from GitHub Cron (unreliable) to **Google Cloud Scheduler** for precise 15-minute telemetry updates.
 
 ---
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif" width="28" align="center"> The ML Roadmap
+## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif" width="28" align="center"> Roadmap
 
 - [x] **Phase 1:** Migrate from flat CSVs to Cloud NoSQL (Firebase).
-- [x] **Phase 2:** Build and deploy a real-time **Streamlit Dashboard** with 3D Spatial Mapping.
-- [ ] **Phase 3:** Train an **LSTM Neural Network** to predict traffic 60 minutes in advance based on current rain intensity and historical delays.
+- [x] **Phase 2:** Implement **Gemini 1.5** for automated commute broadcasting.
+- [x] **Phase 3:** Create a 15-minute automated scraper pipeline.
+- [ ] **Phase 4:** Develop a predictive traffic alerting system via WhatsApp API.
 
 ---
 
