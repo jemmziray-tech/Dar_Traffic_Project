@@ -93,12 +93,15 @@ with tab1:
         "This heatmap aggregates thousands of data points to show the exact hours when Dar es Salaam gridlocks."
     )
 
-    # Create a Pivot Table for the Heatmap
-    pivot_df = df.pivot_table(
-        index="Day", columns="Hour", values="delay_mins", aggfunc="mean"
-    ).fillna(0)
+    # 1. Convert any decimal hours (11.5) into clean integers (11)
+    df["Clean_Hour"] = df["Hour"].astype(int)
 
-    # Sort days chronologically
+    # 2. Create the Pivot Table using the NEW Clean_Hour column
+    pivot_df = df.pivot_table(
+        index="Day", columns="Clean_Hour", values="delay_mins", aggfunc="mean"
+    )
+
+    # 3. Sort days chronologically (Y-Axis)
     days_order = [
         "Monday",
         "Tuesday",
@@ -110,12 +113,25 @@ with tab1:
     ]
     pivot_df = pivot_df.reindex(days_order)
 
+    # 4. THE FIX: Restrict the X-Axis to ONLY show 6 AM to 11 PM (6 to 23)
+    target_hours = list(range(6, 24))
+    pivot_df = pivot_df.reindex(columns=target_hours).fillna(0)
+
+    # 5. Draw the heatmap
     fig_heat = px.imshow(
         pivot_df,
-        labels=dict(x="Hour of Day", y="Day of Week", color="Average Delay (Mins)"),
+        labels=dict(
+            x="Hour of Day (6 = 6 AM, 23 = 11 PM)",
+            y="Day of Week",
+            color="Average Delay (Mins)",
+        ),
         color_continuous_scale="YlOrRd",
         aspect="auto",
     )
+
+    # 6. Lock the Plotly X-Axis to show every single number cleanly
+    fig_heat.update_xaxes(tickmode="linear", dtick=1)
+
     st.plotly_chart(fig_heat, use_container_width=True)
 
 # ==========================================
