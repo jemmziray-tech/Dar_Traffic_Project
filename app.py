@@ -4,17 +4,13 @@ import time
 from datetime import datetime
 import pytz
 import pandas as pd
-import google.generativeai as genai
 import pydeck as pdk
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 import joblib
 import plotly.express as px
-from dotenv import load_dotenv
-
-# Load environment variables from .env file for local development
-load_dotenv()
+import google.generativeai as genai  # <-- UPDATED TO GEMINI!
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -40,28 +36,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- 2. Connect to Firebase ---
+# --- 2. Connect to Firebase (THE BULLETPROOF FIX) ---
 if not firebase_admin._apps:
     try:
         if os.path.exists("firebase-key.json"):
-            # Local development (Laptop)
             cred = credentials.Certificate("firebase-key.json")
-
         elif "firebase" in st.secrets:
-            # Cloud deployment (Streamlit)
             if "key_data" in st.secrets["firebase"]:
                 key_dict = json.loads(st.secrets["firebase"]["key_data"])
                 cred = credentials.Certificate(key_dict)
             else:
                 firebase_secrets = dict(st.secrets["firebase"])
                 cred = credentials.Certificate(firebase_secrets)
-
         else:
             st.error("No valid Firebase credentials found.", icon=":material/error:")
             st.stop()
-
         firebase_admin.initialize_app(cred)
-
     except Exception as e:
         st.error(f"Connection Error: {e}", icon=":material/wifi_off:")
         st.stop()
@@ -150,15 +140,12 @@ st.sidebar.caption("**Infrastructure:** Firebase & GitHub Actions")
 st.sidebar.markdown("---")
 st.sidebar.caption("Built by John Mziray | Data Engineering Portfolio")
 
-# --- AI Model Health Sidebar Section ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🧠 AI Model Health")
-
 if os.path.exists("model_metrics.csv"):
     try:
         metrics_df = pd.read_csv("model_metrics.csv")
         latest_metrics = metrics_df.iloc[-1]
-
         st.sidebar.metric(
             label="Current AI Accuracy (Error Margin)",
             value=f"± {latest_metrics['MAE_Minutes']} Mins",
@@ -167,12 +154,10 @@ if os.path.exists("model_metrics.csv"):
             f"**Knowledge Base:** Trained on {int(latest_metrics['Total_Rows_Trained'])} historical data points."
         )
         st.sidebar.caption(f"**Last Retrained:** {latest_metrics['Date']}")
-
         if len(metrics_df) > 1:
             with st.sidebar.expander("📈 View Learning Curve"):
                 st.caption("Lower error means the AI is getting smarter!")
                 st.line_chart(metrics_df.set_index("Date")["MAE_Minutes"])
-
     except Exception as e:
         st.sidebar.caption("Parsing model metrics...")
 else:
@@ -185,7 +170,6 @@ st.title("DAR ES SALAAM TRAFFIC INTELLIGENCE")
 st.markdown("---")
 
 if not df.empty:
-    # --- ROW 1: City Health Hero ---
     c1, c2, c3, c4 = st.columns(4)
     avg_speed = df_raw["speed_kmh"].mean()
     total_delay = df_raw["delay_mins"].sum()
@@ -205,7 +189,6 @@ if not df.empty:
     c4.metric(
         "LAST SYNC", time_str, delta="Verified by Google API", delta_color="normal"
     )
-
     st.markdown("---")
 
     # --- THE GEN-AI COMMUTE COPILOT (GEMINI INTEGRATION) ---
@@ -247,14 +230,13 @@ if not df.empty:
                         4. Do NOT use markdown or asterisks, just plain broadcast text.
                         """
 
-                        model = genai.GenerativeModel("gemini-2.5-flash")
+                        model = genai.GenerativeModel("gemini-1.5-flash")
                         response = model.generate_content(system_prompt)
 
                         st.success(response.text)
                         st.caption(
-                            "🤖 Broadcast generated dynamically in real-time by Google Gemini 2.5 Flash using live Scikit-Learn telemetry."
+                            "🤖 Broadcast generated dynamically by Google Gemini 1.5 using live Scikit-Learn telemetry."
                         )
-
                     except Exception as e:
                         st.error(f"GenAI API Error: {e}")
     else:
@@ -266,15 +248,10 @@ if not df.empty:
 
     # --- ECONOMIC IMPACT CALCULATOR ---
     st.subheader(":material/payments: Economic Impact of Congestion")
-
-    # Economic Assumptions (TZS)
-    COST_PER_MINUTE_PER_CAR = 101  # 50 TZS Time + 51 TZS Fuel
-    ASSUMED_CARS_PER_NODE = 500  # Estimated traffic volume per road
-
-    # Calculate the financial drain
+    COST_PER_MINUTE_PER_CAR = 101
+    ASSUMED_CARS_PER_NODE = 500
     total_wasted_tzs = total_delay * COST_PER_MINUTE_PER_CAR * ASSUMED_CARS_PER_NODE
 
-    # Format the number to look like beautiful currency (e.g., 1.2M TZS)
     if total_wasted_tzs >= 1000000:
         formatted_cost = f"{total_wasted_tzs / 1000000:.1f}M TZS"
     elif total_wasted_tzs >= 1000:
@@ -283,7 +260,6 @@ if not df.empty:
         formatted_cost = f"{total_wasted_tzs:,.0f} TZS"
 
     eco1, eco2, eco3 = st.columns(3)
-
     with eco1:
         st.metric(
             label="Estimated Capital Lost (Live)",
@@ -292,7 +268,6 @@ if not df.empty:
             delta_color="inverse",
         )
     with eco2:
-        # Just a fun metric to show what that money could have bought
         liters_wasted = total_delay * 0.016 * ASSUMED_CARS_PER_NODE
         st.metric(
             label="Total Fuel Wasted",
@@ -334,19 +309,15 @@ if not df.empty:
                     "**Optimal Flow:** City traffic is moving within normal parameters.",
                     icon=":material/gpp_good:",
                 )
-
             st.write(f"**City Flow Efficiency:** {efficiency:.1f}%")
             st.progress(efficiency / 100)
 
     with col_ai_right:
         with st.container(border=True):
             st.subheader(":material/psychology: AI Traffic Predictor")
-
             if os.path.exists("traffic_model.pkl"):
                 ai_model = joblib.load("traffic_model.pkl")
-
                 ai_p1, ai_p2, ai_p3, ai_p4 = st.columns(4)
-
                 with ai_p1:
                     p_road = st.selectbox("Road", list(ROAD_COORDS.keys()))
                 with ai_p2:
@@ -387,10 +358,8 @@ if not df.empty:
 
                 h, m = map(int, p_time_str.split(":"))
                 target_fraction = h + (m / 60.0)
-
                 start_frac = max(6.0, target_fraction - 1.25)
                 end_frac = min(23.75, target_fraction + 1.25)
-
                 step_count = int((end_frac - start_frac) / 0.25) + 1
                 curve_hours = [start_frac + (i * 0.25) for i in range(step_count)]
 
@@ -402,7 +371,6 @@ if not df.empty:
                         "Condition": [p_weather] * len(curve_hours),
                     }
                 )
-
                 curve_df["Predicted_Delay"] = ai_model.predict(curve_df)
 
                 def format_frac_time(f):
@@ -434,7 +402,6 @@ if not df.empty:
                     xaxis_title=None,
                     yaxis_title="Mins Delay",
                 )
-
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info(
@@ -457,11 +424,8 @@ if not df.empty:
         st.caption(
             "Watch the city's traffic pulse throughout the day. Powered by your Random Forest AI Model."
         )
-
         if os.path.exists("traffic_model.pkl"):
             ai_model = joblib.load("traffic_model.pkl")
-
-            # --- 1. Simulation Controls ---
             sim_c1, sim_c2, sim_c3 = st.columns([2, 2, 1])
             with sim_c1:
                 sim_day = st.selectbox(
@@ -485,7 +449,7 @@ if not df.empty:
                     key="sim_weather",
                 )
             with sim_c3:
-                st.write("")  # Spacing alignment
+                st.write("")
                 st.write("")
                 play_animation = st.button(
                     "▶ Play Animation", use_container_width=True, type="primary"
@@ -500,11 +464,9 @@ if not df.empty:
                 key="sim_hour",
             )
 
-            # --- 2. The AI Rendering Engine ---
             def generate_pydeck_map(target_hour):
                 sim_data = []
                 for r_id, coords in ROAD_COORDS.items():
-                    # Feed the AI the specific hour, day, and weather for this specific road
                     pred_df = pd.DataFrame(
                         {
                             "road_id": [r_id],
@@ -514,18 +476,12 @@ if not df.empty:
                         }
                     )
                     pred_delay = ai_model.predict(pred_df)[0]
-
-                    # Dynamically adjust colors based on the AI's prediction
                     if pred_delay < 1.0:
-                        color = [40, 167, 69, 200]  # Green (Smooth)
-                        status = "Smooth"
+                        color, status = [40, 167, 69, 200], "Smooth"
                     elif pred_delay < 2.5:
-                        color = [255, 193, 7, 220]  # Yellow (Moderate)
-                        status = "Moderate"
+                        color, status = [255, 193, 7, 220], "Moderate"
                     else:
-                        color = [220, 53, 69, 255]  # Red (Heavy Jam)
-                        status = "Heavy Jam"
-
+                        color, status = [220, 53, 69, 255], "Heavy Jam"
                     sim_data.append(
                         {
                             "name": r_id.replace("_", " ").title(),
@@ -534,15 +490,11 @@ if not df.empty:
                             "delay_mins": round(pred_delay, 1),
                             "status": status,
                             "color": color,
-                            "elevation_val": max(
-                                pred_delay * 1.5, 0.5
-                            ),  # Scale height for visual impact
+                            "elevation_val": max(pred_delay * 1.5, 0.5),
                         }
                     )
 
                 sim_df = pd.DataFrame(sim_data)
-
-                # Build the 3D Map
                 tooltip = {
                     "html": "<b>{name}</b><br/>Simulated Time: "
                     + f"{int(target_hour):02d}:00"
@@ -576,11 +528,9 @@ if not df.empty:
                     map_style="dark",
                 )
 
-            # --- 3. The Animation Loop ---
-            map_placeholder = st.empty()  # Creates a blank container we can overwrite
+            map_placeholder = st.empty()
 
             if play_animation:
-                # Loop through the day and overwrite the map every 0.6 seconds
                 for h in range(6, 24):
                     with map_placeholder.container():
                         st.markdown(
@@ -591,14 +541,12 @@ if not df.empty:
                     time.sleep(0.6)
                 st.toast("Simulation Complete!", icon="✅")
             else:
-                # Static render based on where the user drags the slider
                 with map_placeholder.container():
                     st.markdown(
                         f"<h4 style='text-align: center; color: #9e9e9e;'>⏰ Time: {slider_hour:02d}:00</h4>",
                         unsafe_allow_html=True,
                     )
                     st.pydeck_chart(generate_pydeck_map(slider_hour))
-
         else:
             st.info(
                 "The AI model needs to finish training before the Time Machine can simulate city-wide traffic.",
@@ -638,7 +586,6 @@ if not df.empty:
                             f":material/cloud: {row['weather'].upper()} | :material/router: {row['id']}"
                         )
 
-    # --- FOOTER: METHODOLOGY ---
     with st.expander(
         ":material/science: How does this dashboard work?", expanded=False
     ):
@@ -648,7 +595,6 @@ if not df.empty:
         * :material/account_tree: **Machine Learning:** Scikit-Learn Random Forest Regressor calculates exact fractional-hour predictions across 10 global road networks.
         * :material/database: **Cloud Storage:** Google Cloud Firestore NoSQL Database.
         * :material/speed: **Live Rendering:** Real-time 3D telemetry rendering via Streamlit and Pydeck.
-        * :material/podcasts: **GenAI Integration:** OpenAI RAG system for live broadcast generation.
         """)
 else:
     st.info("No data available based on current filters.", icon=":material/info:")
