@@ -19,7 +19,7 @@ load_dotenv()
 # 1. CLOUD INITIALIZATION (THE FIX)
 # ---------------------------------------------------------
 # Check for GitHub Secrets first, fallback to local file
-firebase_secret = os.getenv("FIREBASE_KEY") or os.getenv("FIREBASE_CREDENTIALS")
+firebase_secret = os.getenv("FIREBASE_KEY_JSON") or os.getenv("FIREBASE_CREDENTIALS")
 
 if firebase_secret:
     # Running in GitHub Actions: Read the raw JSON text from the secret
@@ -36,7 +36,7 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+GOOGLE_API_KEY = os.getenv("MAPS_API_KEY")
 gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
 
 # ---------------------------------------------------------
