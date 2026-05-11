@@ -42,7 +42,7 @@ def get_historical_data(road_id):
         stats_ref.where("road_id", "==", road_id)
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
         .limit(
-            20000
+            40000
         )  # THE FIX: Increased from 200 so you get weeks of data, not just 2 days!
     )
     results = query.stream()
