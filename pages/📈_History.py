@@ -364,6 +364,7 @@ if selected_road:
                     time_saved = planned_delay - early_delay
                     alt_time_str = f"{target_hour_int - 1:02d}:00"
 
+
                 # UPDATED: Respects the 11 PM (23:00) boundary
                 if (
                     target_hour_int + 1 <= 23
