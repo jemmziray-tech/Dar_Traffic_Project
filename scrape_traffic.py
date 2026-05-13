@@ -133,6 +133,27 @@ ROADS = [
         "end": "-6.8210,39.2750",
         "dist": 1.1,
     },
+    {
+        "id": "posta_to_tegeta",
+        "name": "Mega-Route: Posta to Tegeta (Bagamoyo Rd)",
+        "start": "-6.8160,39.2880",
+        "end": "-6.6430,39.1550",
+        "dist": 22.0,
+    },
+    {
+        "id": "posta_to_kimara",
+        "name": "Mega-Route: Posta to Kimara (Morogoro Rd)",
+        "start": "-6.8160,39.2880",
+        "end": "-6.7800,39.1500",
+        "dist": 17.5,
+    },
+    {
+        "id": "posta_to_gongolamboto",
+        "name": "Mega-Route: Posta to Gongo la Mboto (Nyerere Rd)",
+        "start": "-6.8160,39.2880",
+        "end": "-6.8850,39.1670",
+        "dist": 18.0,
+    },
 ]
 
 
