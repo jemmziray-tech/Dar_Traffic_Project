@@ -17,16 +17,27 @@ print("🚀 Booting Advanced Enterprise AI Training Pipeline...")
 
 # --- 1. Define Target Roads ---
 TARGET_ROADS = [
-    "kilwa_mbagala",
-    "mandela_buguruni",
+    "ubungo",
     "mwenge",
-    "old_bagamoyo",
     "selander",
     "tazara",
-    "ubungo",
+    "mandela_buguruni",
+    "kilwa_mbagala",
+    "old_bagamoyo",
     "sam_nujoma",
     "uhuru_street",
-    "kariakoo",
+    "posta_to_tegeta",
+    "posta_to_kimara",
+    "posta_to_gongolamboto",
+    "tabata_dampo",
+    "kamata_gerezani",
+    "changombe_road",
+    "morocco_intersection",
+    "kigogo_roundabout",
+    "fire_upanga",
+    "mwai_kibaki",
+    "sinza_mori",
+    "goba_massana"
 ]
 
 # --- 2. Connect to Firebase & Fetch Data ---

@@ -154,6 +154,81 @@ ROADS = [
         "end": "-6.8850,39.1670",
         "dist": 18.0,
     },
+    # --- THE INDUSTRIAL & TRUCK CHOKE POINTS ---
+    # Tabata is infamous. It is a dense residential area with very few exits, crossing a major highway.
+    {
+        "id": "tabata_dampo",
+        "name": "Tabata Road (Mandela to Segerea)",
+        "start": "-6.8150,39.2320",
+        "end": "-6.8300,39.2050",
+        "dist": 3.8,
+    },
+    # Kamata intersection is where all heavy trucks from the port meet commuter traffic trying to enter the CBD.
+    {
+        "id": "kamata_gerezani",
+        "name": "Kamata / Gerezani (Port Entry)",
+        "start": "-6.8280,39.2780",
+        "end": "-6.8180,39.2850",
+        "dist": 1.5,
+    },
+    # The Chang'ombe industrial area. Massive trucks, bad roads, slow movement.
+    {
+        "id": "changombe_road",
+        "name": "Chang'ombe Road (Temeke)",
+        "start": "-6.8350,39.2700",
+        "end": "-6.8550,39.2650",
+        "dist": 2.5,
+    },
+    # --- THE INNER-CITY GRIDLOCKS ---
+    # Morocco is a massive intersection where Ali Hassan Mwinyi meets Kawawa Road. Pure chaos at 5:30 PM.
+    {
+        "id": "morocco_intersection",
+        "name": "Kawawa Rd (Morocco to Kinondoni)",
+        "start": "-6.7820,39.2630",
+        "end": "-6.7950,39.2580",
+        "dist": 2.0,
+    },
+    # Kigogo roundabout connects the Magomeni area to Ilala. It floods easily and is a massive bottleneck.
+    {
+        "id": "kigogo_roundabout",
+        "name": "Kawawa Rd (Kigogo Choke)",
+        "start": "-6.8120,39.2550",
+        "end": "-6.8220,39.2500",
+        "dist": 1.5,
+    },
+    # Fire/United Nations Road is the primary exit out of the CBD towards Upanga.
+    {
+        "id": "fire_upanga",
+        "name": "UN Road (Fire to Upanga)",
+        "start": "-6.8120,39.2780",
+        "end": "-6.8020,39.2720",
+        "dist": 1.2,
+    },
+    # --- THE SUBURBAN FEEDER TRAPS ---
+    # Mwai Kibaki road (formerly Old Bagamoyo) is heavily used by Kawe/Mikocheni residents to bypass the main highway.
+    {
+        "id": "mwai_kibaki",
+        "name": "Mwai Kibaki Rd (Kawe to Mikocheni)",
+        "start": "-6.7450,39.2350",
+        "end": "-6.7650,39.2500",
+        "dist": 3.5,
+    },
+    # Sinza is a commercial hub with narrow roads, lots of bars, and unpredictable parking. Always jammed at night.
+    {
+        "id": "sinza_mori",
+        "name": "Sinza Road (Mori to Bamaga)",
+        "start": "-6.7780,39.2350",
+        "end": "-6.7700,39.2450",
+        "dist": 2.0,
+    },
+    # Goba road is rapidly developing. Everyone moving out of the city center lives here now, and the roads can't handle it.
+    {
+        "id": "goba_massana",
+        "name": "Goba Road (Massana to Goba Center)",
+        "start": "-6.7250,39.2150",
+        "end": "-6.7150,39.1850",
+        "dist": 4.0,
+    },
 ]
 
 
