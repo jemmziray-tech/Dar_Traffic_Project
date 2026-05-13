@@ -89,7 +89,7 @@ with tab1:
     days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     pivot_df = pivot_df.reindex(days_order)
 
-    target_hours = list(range(6, 24))
+    target_hours = list(range(6, 23))
     pivot_df = pivot_df.reindex(columns=target_hours).fillna(0)
 
     fig_heat = px.imshow(
