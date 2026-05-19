@@ -34,8 +34,7 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# Using the fixed environment variable name!
-GOOGLE_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+GOOGLE_API_KEY = os.getenv("MAPS_API_KEY")
 gmaps = None
 
 
@@ -226,7 +225,8 @@ ROADS = [
 def get_weather():
     url = "https://api.open-meteo.com/v1/forecast?latitude=-6.7978&longitude=39.2201&current_weather=true"
     try:
-        data = requests.get(url).json()
+        # 🚨 FIXED: Added a strict 10-second timeout to prevent infinite hanging
+        data = requests.get(url, timeout=10).json()
         temp = data["current_weather"]["temperature"]
         code = data["current_weather"]["weathercode"]
         condition = "Clear" if code <= 3 else "Rainy" if code >= 51 else "Cloudy"
@@ -304,7 +304,7 @@ if __name__ == "__main__":
 
     if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not GOOGLE_API_KEY:
         logging.error(
-            "You forgot to configure your Google API Key in the environment or GitHub Secrets!"
+            "You forgot to configure your Google API Key (MAPS_API_KEY) in the environment or GitHub Secrets!"
         )
     else:
         gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
