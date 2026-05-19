@@ -1,20 +1,19 @@
-import streamlit as st
+import os
+import json
 import pandas as pd
 import plotly.express as px
+import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-import json
-import os
 
-st.set_page_config(page_title="Advanced Analytics", page_icon="📊", layout="wide")
+# --- 1. SETUP PAGE CONFIG (Enterprise Polish) ---
+st.set_page_config(page_title="Advanced Analytics", page_icon=":material/analytics:", layout="wide")
 
-st.title("📊 Advanced Traffic Analytics")
-st.markdown(
-    "Deep-dive business intelligence and meteorological impact analysis for Dar es Salaam."
-)
+st.title(":material/query_stats: Advanced Traffic Analytics")
+st.markdown("Deep-dive business intelligence, spatial bottlenecks, and meteorological impact analysis.")
+st.markdown("---")
 
-
-# --- 1. SECURE FIREBASE CONNECTION (Cached for speed) ---
+# --- 2. SECURE FIREBASE CONNECTION ---
 @st.cache_resource
 def get_db():
     if not firebase_admin._apps:
@@ -27,9 +26,8 @@ def get_db():
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
-
-# --- 2. DATA FETCHING & CLEANING (Cached for speed) ---
-@st.cache_data(ttl=3600)  # Caches for 1 hour so it doesn't slow down the app
+# --- 3. DATA FETCHING & SANITIZATION ---
+@st.cache_data(ttl=3600)
 def load_historical_data():
     db = get_db()
     docs = (
@@ -42,7 +40,6 @@ def load_historical_data():
     data = []
     for doc in docs:
         row = doc.to_dict()
-        # Clean the timestamp
         if "timestamp" in row and row["timestamp"]:
             row["datetime"] = row["timestamp"]
         data.append(row)
@@ -50,116 +47,119 @@ def load_historical_data():
     df = pd.DataFrame(data)
 
     if not df.empty:
-        df["datetime"] = pd.to_datetime(df["datetime"], utc=True).dt.tz_convert(
-            "Africa/Dar_es_Salaam"
-        )
+        df["datetime"] = pd.to_datetime(df["datetime"], utc=True).dt.tz_convert("Africa/Dar_es_Salaam")
         df["Hour"] = df["datetime"].dt.hour
         df["Day"] = df["datetime"].dt.day_name()
-        # Clean Weather (Extract just "Clear", "Rainy", "Cloudy")
+        
+        # Clean Weather & Remove "Unknown" Noise
         df["Condition"] = df["weather"].apply(
             lambda x: str(x).split(", ")[-1] if pd.notnull(x) else "Unknown"
         )
+        # Filter strictly for actionable meteorological states
+        df = df[df["Condition"].isin(["Clear", "Rainy", "Cloudy"])]
 
     return df
 
-
-# --- 3. LOAD DATA ---
-with st.spinner("Crunching historical datasets..."):
+# --- 4. LOAD DATA ---
+with st.spinner("Compiling historical telemetry datasets..."):
     df = load_historical_data()
 
 if df.empty:
-    st.warning(
-        "Not enough historical data collected yet. Let the scraper run for a few more days!"
-    )
+    st.warning("Insufficient historical telemetry. Awaiting further ingestion cycles.", icon=":material/warning:")
     st.stop()
 
-# --- 4. CLEAN UI TABS ---
-# This is how we keep the app from looking cluttered!
-tab1, tab2, tab3, tab4 = st.tabs(
-    [
-        "⏱️ The 'Rush Hour' Matrix",
-        "🌦️ Meteorological Impact",
-        "💰 Cost of Congestion",
-        "🤖 AI Model Accuracy (MLOps)",  # The Recruiter's Tab
-    ]
-)
+# --- 5. ENTERPRISE UI TABS ---
+tab1, tab2, tab3, tab4 = st.tabs([
+    ":material/grid_on: Temporal Flow Matrix",
+    ":material/water_drop: Meteorological Friction",
+    ":material/payments: Capital Degradation",
+    ":material/model_training: MLOps Diagnostics"
+])
 
 # ==========================================
-# TAB 1: TIME-SERIES HEATMAP
+# TAB 1: TEMPORAL FLOW MATRIX
 # ==========================================
 with tab1:
-    st.subheader("Identifying the True Rush Hour")
-    st.write(
-        "This heatmap aggregates thousands of data points to show the exact hours when Dar es Salaam gridlocks."
-    )
+    st.subheader("Temporal Congestion Distribution")
+    st.write("Aggregated heatmap identifying systemic network gridlock by hour and day.")
 
-    # 1. Convert any decimal hours (11.5) into clean integers (11)
     df["Clean_Hour"] = df["Hour"].astype(int)
+    pivot_df = df.pivot_table(index="Day", columns="Clean_Hour", values="delay_mins", aggfunc="mean")
 
-    # 2. Create the Pivot Table using the NEW Clean_Hour column
-    pivot_df = df.pivot_table(
-        index="Day", columns="Clean_Hour", values="delay_mins", aggfunc="mean"
-    )
-
-    # 3. Sort days chronologically (Y-Axis)
-    days_order = [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
-    ]
+    days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     pivot_df = pivot_df.reindex(days_order)
 
-    # 4. THE FIX: Restrict the X-Axis to ONLY show 6 AM to 11 PM (6 to 23)
-    target_hours = list(range(6, 24))
+    target_hours = list(range(6, 23))
     pivot_df = pivot_df.reindex(columns=target_hours).fillna(0)
 
-    # 5. Draw the heatmap
     fig_heat = px.imshow(
         pivot_df,
-        labels=dict(
-            x="Hour of Day (6 = 6 AM, 23 = 11 PM)",
-            y="Day of Week",
-            color="Average Delay (Mins)",
-        ),
+        labels=dict(x="Operating Hour (06:00 - 23:00)", y="Day of Week", color="Mean Delay (Mins)"),
         color_continuous_scale="YlOrRd",
         aspect="auto",
     )
-
-    # 6. Lock the Plotly X-Axis to show every single number cleanly
     fig_heat.update_xaxes(tickmode="linear", dtick=1)
-
     st.plotly_chart(fig_heat, use_container_width=True)
 
 # ==========================================
-# TAB 2: WEATHER CORRELATION
+# TAB 2: METEOROLOGICAL FRICTION (Includes Feature 1)
 # ==========================================
 with tab2:
-    st.subheader("How much does rain slow down the city?")
-    st.write("Comparing average speeds (km/h) across different weather conditions.")
+    col_weather_top, col_weather_bottom = st.container(), st.container()
+    
+    with col_weather_top:
+        st.subheader("Velocity vs. Meteorological State")
+        st.write("Distribution of traffic velocity (km/h) mapped against active weather conditions.")
 
-    fig_weather = px.box(
-        df,
-        x="Condition",
-        y="speed_kmh",
-        color="Condition",
-        points="all",
-        title="Traffic Velocity vs. Weather Conditions",
-        labels={"speed_kmh": "Speed (km/h)", "Condition": "Weather"},
-    )
-    st.plotly_chart(fig_weather, use_container_width=True)
+        fig_weather = px.box(
+            df,
+            x="Condition",
+            y="speed_kmh",
+            color="Condition",
+            points="all",
+            labels={"speed_kmh": "Velocity (km/h)", "Condition": "Meteorological State"},
+        )
+        st.plotly_chart(fig_weather, use_container_width=True)
+
+    st.markdown("---")
+
+    with col_weather_bottom:
+        st.subheader("Infrastructure Vulnerability Index")
+        st.write("Quantifying the percentage drop in standard velocity per artery during precipitation events.")
+
+        # --- FEATURE 1: Drainage / Rain Vulnerability Math ---
+        df_weather_impact = df[df["Condition"].isin(["Clear", "Rainy"])]
+        
+        weather_pivot = df_weather_impact.pivot_table(
+            index="name", columns="Condition", values="speed_kmh", aggfunc="mean"
+        ).dropna()
+
+        if "Clear" in weather_pivot.columns and "Rainy" in weather_pivot.columns:
+            # Calculate the percentage degradation
+            weather_pivot["Degradation_Pct"] = ((weather_pivot["Clear"] - weather_pivot["Rainy"]) / weather_pivot["Clear"]) * 100
+            weather_pivot = weather_pivot.sort_values(by="Degradation_Pct", ascending=True).reset_index()
+
+            fig_vuln = px.bar(
+                weather_pivot,
+                x="Degradation_Pct",
+                y="name",
+                orientation="h",
+                color="Degradation_Pct",
+                color_continuous_scale="Reds",
+                labels={"Degradation_Pct": "Velocity Degradation (%)", "name": "Monitored Artery"},
+            )
+            fig_vuln.update_traces(texttemplate='%{x:.1f}%', textposition='outside')
+            st.plotly_chart(fig_vuln, use_container_width=True)
+        else:
+            st.info("Insufficient precipitation variance data to compute vulnerability matrix.", icon=":material/info:")
 
 # ==========================================
-# TAB 3: COST OF CONGESTION
+# TAB 3: CAPITAL DEGRADATION (Cost of Congestion)
 # ==========================================
 with tab3:
-    st.subheader("The Most Expensive Bottlenecks")
-    st.write("Ranking roads by the total cumulative minutes lost to traffic jams.")
+    st.subheader("Macro-Level Economic Friction")
+    st.write("Ranking arteries by absolute cumulative minutes lost to systemic congestion.")
 
-    # Aggregate total delay by road
     delay_by_road = (
         df.groupby("name")["delay_mins"]
         .sum()
@@ -174,19 +174,16 @@ with tab3:
         orientation="h",
         color="delay_mins",
         color_continuous_scale="Reds",
-        title="Total Cumulative Delay by Road",
-        labels={"delay_mins": "Total Minutes Lost", "name": "Road Segment"},
+        labels={"delay_mins": "Total Cumulative Delay (Mins)", "name": "Monitored Artery"},
     )
     st.plotly_chart(fig_cost, use_container_width=True)
 
 # ==========================================
-# TAB 4: AI MODEL ACCURACY (For the Recruiter)
+# TAB 4: MLOPS DIAGNOSTICS
 # ==========================================
 with tab4:
-    st.subheader("Predictive Model Performance")
-    st.write(
-        "We believe in transparent AI. Here are the latest evaluation metrics from our automated weekly retraining pipeline."
-    )
+    st.subheader("Predictive Engine Diagnostics")
+    st.write("Real-time telemetry regarding the Scikit-Learn Random Forest accuracy margins.")
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(current_dir)
@@ -194,33 +191,24 @@ with tab4:
 
     try:
         metrics_df = pd.read_csv(metrics_path)
-
         col1, col2, col3 = st.columns(3)
         latest_metrics = metrics_df.iloc[-1]
 
-        # Mapping to YOUR exact CSV column names
         col1.metric(
             "Mean Absolute Error (MAE)",
-            f"{latest_metrics['MAE_Minutes']:.2f} mins",
-            delta="Lower is better",
+            f"± {latest_metrics['MAE_Minutes']:.2f} mins",
+            delta="Variance Threshold",
             delta_color="inverse",
         )
 
-        # Safely check for R2_Score (in case your older rows don't have it yet)
         if "R2_Score" in metrics_df.columns and pd.notna(latest_metrics["R2_Score"]):
-            col2.metric(
-                "Model R² Score",
-                f"{latest_metrics['R2_Score']:.2f}",
-                help="1.0 is perfect prediction",
-            )
+            col2.metric("Coefficient of Determination (R²)", f"{latest_metrics['R2_Score']:.2f}")
         else:
-            col2.metric("Model R² Score", "Pending...")
+            col2.metric("Coefficient of Determination (R²)", "Compiling...")
 
-        col3.metric("Last Retrained", str(latest_metrics["Date"]).split()[0])
+        col3.metric("Last Weights Update", str(latest_metrics["Date"]).split()[0])
 
-        st.success("✅ Model is performing within acceptable enterprise thresholds.")
+        st.success("Target model operating within acceptable standard deviation thresholds.", icon=":material/verified:")
 
     except FileNotFoundError:
-        st.info(
-            "Metrics file not found locally. To view this tab, run `python train_model.py` in your terminal!"
-        )
+        st.info("Local metrics missing. Execute primary training pipeline to establish baselines.", icon=":material/search_off:")
