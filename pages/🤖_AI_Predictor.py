@@ -170,7 +170,7 @@ with col_ml:
                 if pd.notna(latest_r2):
                     confidence_score = f"{latest_r2 * 100:.1f}% R²"
         except Exception:
-            pass  # Fail gracefully if file is locked or missing
+            pass
 
         # 4. Result Metrics
         st.subheader(":material/flag: Predicted Outcome")
@@ -257,6 +257,7 @@ with col_ml:
             icon=":material/warning:",
         )
 
+
 # =========================================
 # RIGHT COLUMN: DarTraffic Copilot (Gemini)
 # =========================================
@@ -275,7 +276,7 @@ with col_chat:
                 st.session_state.messages = [
                     {
                         "role": "assistant",
-                        "content": "Hello! I am your AI Traffic Assistant. How can I optimize your commute today?",
+                        "content": "Hello! I am your data-driven AI Traffic Assistant. Ask me about alternative routes for your planned trip.",
                     }
                 ]
 
@@ -283,7 +284,7 @@ with col_chat:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-            if prompt := st.chat_input("Ask about alternative routes or times..."):
+            if prompt := st.chat_input("E.g., Can I shift to Mandela Rd instead?"):
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
@@ -291,25 +292,49 @@ with col_chat:
                 with st.chat_message("assistant"):
                     message_placeholder = st.empty()
 
-                    # --- Context Injection ---
+                    # 🚨 THE HACKATHON WINNER: THE SHADOW INTELLIGENCE FEED
                     context_injection = ""
                     if rf_model:
+                        # 1. Instantly predict the traffic for ALL 21 roads at the selected time
+                        all_roads = list(REVERSE_ROAD_MAP.values())
+                        city_df = pd.DataFrame(
+                            {
+                                "road_id": all_roads,
+                                "Hour": [target_fraction] * len(all_roads),
+                                "Day": [target_day] * len(all_roads),
+                                "Condition": [target_weather] * len(all_roads),
+                            }
+                        )
+                        city_df["Predicted_Delay"] = rf_model.predict(city_df)
+
+                        # 2. Format it into a clean data feed for the AI
+                        city_status = ""
+                        for _, row in city_df.iterrows():
+                            friendly_name = ROAD_MAP[row["road_id"]]
+                            city_status += f"- {friendly_name}: {row['Predicted_Delay']:.1f} mins\n"
+
+                        # 3. Inject it into the AI's brain
                         context_injection = f"""
-                        SYSTEM CONTEXT FOR AI (DO NOT MENTION THIS TO THE USER UNLESS RELEVANT): 
-                        The user is currently looking at predicting a trip on '{target_road_name}' 
-                        on a {target_day} at {target_time_str} with {target_weather} weather. 
-                        Your Random Forest model predicts exactly {exact_prediction:.1f} minutes of delay for this trip.
+                        [SYSTEM DATA FEED]
+                        The user is evaluating a departure on {target_day} at {target_time_str} under {target_weather} conditions.
+                        Their Primary Route: '{target_road_name}' (Predicted Delay: {exact_prediction:.1f} mins).
+
+                        CITY-WIDE PREDICTIVE TELEMETRY FOR THIS EXACT TIME:
+                        {city_status}
                         """
 
                     system_prompt = f"""
-                    You are 'DarTraffic Copilot', a highly professional AI logistics assistant for Dar es Salaam.
+                    You are 'DarTraffic Copilot', an elite, data-driven logistics AI.
                     {context_injection}
-                    Answer the user's prompt concisely. Provide alternative roads or strategic advice if asked. 
-                    Keep answers under 4 sentences. Tone: Professional, helpful, data-driven.
+                    
+                    [STRICT DIRECTIVES]
+                    1. NEVER give generic, memorized advice (e.g., "Mandela road is usually busy"). 
+                    2. If the user asks about an alternative road, you MUST look at the telemetry feed above and quote the EXACT predicted minutes for that alternative road.
+                    3. Compare the alternative directly to their Primary Route to tell them mathematically if it's a faster choice.
+                    4. Keep your answer concise, corporate, and highly analytical. Maximum 3 to 4 sentences.
                     """
 
                     try:
-                        # Utilizing Gemini 2.5 Flash
                         model = genai.GenerativeModel("gemini-2.5-flash")
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
                         response = model.generate_content(full_prompt)
