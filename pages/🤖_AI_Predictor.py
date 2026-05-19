@@ -169,9 +169,21 @@ with col_ml:
             delta=status_text,
             delta_color=pred_color,
         )
+
+        confidence_score = "Active"
+        try:
+            if os.path.exists("model_metrics.csv"):
+                metrics_df = pd.read_csv("model_metrics.csv")
+                latest_r2 = metrics_df.iloc[-1]["R2_Score"]
+                if pd.notna(latest_r2):
+                
+                    confidence_score = f"{latest_r2 * 100:.1f}% R²"
+        except Exception:
+            pass  # Failsafe: leave it as "Active" if the file is locked
+
         m2.metric(
             "Confidence Score",
-            "91.4% R²",
+            confidence_score,
             delta="Validated against historicals",
             delta_color="normal",
         )
@@ -282,7 +294,8 @@ with col_chat:
                     """
 
                     try:
-                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        # 🚨 UPDATED TO 2.5 FLASH HERE
+                        model = genai.GenerativeModel("gemini-2.5-flash")
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
                         response = model.generate_content(full_prompt)
 

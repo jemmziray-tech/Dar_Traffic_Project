@@ -304,12 +304,13 @@ if not df_raw.empty:
                     with st.spinner("Analyzing macro-level routing data..."):
                         try:
                             prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets advising them on current conditions. No markdown."
+                            # 🚨 UPDATED TO 2.5 FLASH HERE
                             response = genai.GenerativeModel(
-                                "gemini-1.5-flash"
+                                "gemini-2.5-flash"
                             ).generate_content(prompt)
                             st.info(response.text)
-                        except:
-                            st.error("Generative AI API Error.")
+                        except Exception as e:
+                            st.error(f"Generative AI API Error: {e}")
             else:
                 st.info(
                     "Provide GEMINI_API_KEY in environment to enable AI Briefings.",
