@@ -8,7 +8,7 @@ import joblib
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# Load Environment Variables securely
+# --- Load Environment Variables securely ---
 load_dotenv()
 
 # --- 1. Setup Page Config ---
@@ -135,11 +135,11 @@ with col_ml:
     st.write("")
 
     if rf_model:
-        # Convert Time to Decimal for Model (e.g., 08:30 -> 8.5)
+        # 1. Convert Time to Decimal for Model (e.g., 08:30 -> 8.5)
         h, m = map(int, target_time_str.split(":"))
         target_fraction = h + (m / 60.0)
 
-        # Make Exact Prediction
+        # 2. Make Exact Prediction
         pred_df = pd.DataFrame(
             {
                 "road_id": [target_road_id],
@@ -161,6 +161,18 @@ with col_ml:
             else ("Moderate Congestion" if exact_prediction <= 10 else "Heavy Gridlock")
         )
 
+        # 3. Dynamic Confidence Score fetching
+        confidence_score = "Active"
+        try:
+            if os.path.exists("model_metrics.csv"):
+                metrics_df = pd.read_csv("model_metrics.csv")
+                latest_r2 = metrics_df.iloc[-1]["R2_Score"]
+                if pd.notna(latest_r2):
+                    confidence_score = f"{latest_r2 * 100:.1f}% R²"
+        except Exception:
+            pass  # Fail gracefully if file is locked or missing
+
+        # 4. Result Metrics
         st.subheader(":material/flag: Predicted Outcome")
         m1, m2 = st.columns(2)
         m1.metric(
@@ -169,18 +181,6 @@ with col_ml:
             delta=status_text,
             delta_color=pred_color,
         )
-
-        confidence_score = "Active"
-        try:
-            if os.path.exists("model_metrics.csv"):
-                metrics_df = pd.read_csv("model_metrics.csv")
-                latest_r2 = metrics_df.iloc[-1]["R2_Score"]
-                if pd.notna(latest_r2):
-                
-                    confidence_score = f"{latest_r2 * 100:.1f}% R²"
-        except Exception:
-            pass  # Failsafe: leave it as "Active" if the file is locked
-
         m2.metric(
             "Confidence Score",
             confidence_score,
@@ -188,7 +188,7 @@ with col_ml:
             delta_color="normal",
         )
 
-        # Generate the Time-Curve (± 1.5 hours around trip)
+        # 5. Generate the Time-Curve with NUMERIC Data
         start_frac = max(6.0, target_fraction - 1.5)
         end_frac = min(23.75, target_fraction + 1.5)
         curve_hours = [
@@ -206,39 +206,54 @@ with col_ml:
         )
         curve_df["Predicted_Delay"] = rf_model.predict(curve_df)
 
+        # Helper to create formatted hover strings
         def format_frac(f):
             hr, mn = int(f), int(round((f - int(f)) * 60))
             return f"{hr:02d}:{mn:02d}"
 
-        curve_df["Time"] = curve_df["Hour"].apply(format_frac)
+        curve_df["Time_Label"] = curve_df["Hour"].apply(format_frac)
 
+        # 6. Build the mathematically safe Plotly chart
         st.markdown("**Departure Window Analysis**")
         fig = px.area(
-            curve_df, x="Time", y="Predicted_Delay", template="plotly_dark", height=250
+            curve_df,
+            x="Hour",
+            y="Predicted_Delay",
+            hover_data={"Time_Label": True, "Hour": False},
+            template="plotly_dark",
+            height=250,
         )
+
         fig.update_traces(line_color="#4B8BBE", fillcolor="rgba(75, 139, 190, 0.2)")
 
-        # Target Trip Vertical Line marker
+        # Add a vertical line using the decimal number, NOT the string
         fig.add_vline(
-            x=target_time_str,
+            x=target_fraction,
             line_width=2,
             line_dash="dash",
             line_color="#ffc107",
             annotation_text="Your Trip",
             annotation_position="top right",
         )
+
+        # Format the X-axis to display strings instead of decimals
         fig.update_layout(
             margin=dict(l=0, r=0, t=10, b=0),
             xaxis_title="",
             yaxis_title="Minutes Delayed",
-            xaxis=dict(showgrid=False),
+            xaxis=dict(
+                showgrid=False,
+                tickmode="array",
+                tickvals=curve_df["Hour"].tolist(),
+                ticktext=curve_df["Time_Label"].tolist(),
+            ),
             yaxis=dict(showgrid=True, gridcolor="#333333"),
         )
         st.plotly_chart(fig, use_container_width=True)
 
     else:
         st.error(
-            "Predictive Model Offline: traffic_model.pkl not found.",
+            "Predictive Model Offline: traffic_model.pkl not found in root directory.",
             icon=":material/warning:",
         )
 
@@ -276,7 +291,7 @@ with col_chat:
                 with st.chat_message("assistant"):
                     message_placeholder = st.empty()
 
-                    # Context Injection
+                    # --- Context Injection ---
                     context_injection = ""
                     if rf_model:
                         context_injection = f"""
@@ -294,7 +309,7 @@ with col_chat:
                     """
 
                     try:
-                        # 🚨 UPDATED TO 2.5 FLASH HERE
+                        # Utilizing Gemini 2.5 Flash
                         model = genai.GenerativeModel("gemini-2.5-flash")
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
                         response = model.generate_content(full_prompt)
