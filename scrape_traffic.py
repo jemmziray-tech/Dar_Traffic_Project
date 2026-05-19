@@ -34,7 +34,7 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-GOOGLE_API_KEY = os.getenv("MAPS_API_KEY")
+MAPS_API_KEY = os.getenv("MAPS_API_KEY")
 gmaps = None
 
 
