@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import concurrent.futures
-from datetime import datetime
 import requests
 import googlemaps
 import firebase_admin
@@ -18,7 +17,7 @@ logging.basicConfig(
 load_dotenv()
 
 # ---------------------------------------------------------
-# 1. CLOUD INITIALIZATION
+# 1. CLOUD INITIALIZATION (Firebase Only)
 # ---------------------------------------------------------
 firebase_secret = os.getenv("FIREBASE_KEY_JSON")
 
@@ -35,7 +34,8 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-GOOGLE_API_KEY = os.getenv("MAPS_API_KEY")
+# Using the fixed environment variable name!
+GOOGLE_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 gmaps = None
 
 
@@ -154,8 +154,6 @@ ROADS = [
         "end": "-6.8850,39.1670",
         "dist": 18.0,
     },
-    # --- THE INDUSTRIAL & TRUCK CHOKE POINTS ---
-    # Tabata is infamous. It is a dense residential area with very few exits, crossing a major highway.
     {
         "id": "tabata_dampo",
         "name": "Tabata Road (Mandela to Segerea)",
@@ -163,7 +161,6 @@ ROADS = [
         "end": "-6.8300,39.2050",
         "dist": 3.8,
     },
-    # Kamata intersection is where all heavy trucks from the port meet commuter traffic trying to enter the CBD.
     {
         "id": "kamata_gerezani",
         "name": "Kamata / Gerezani (Port Entry)",
@@ -171,7 +168,6 @@ ROADS = [
         "end": "-6.8180,39.2850",
         "dist": 1.5,
     },
-    # The Chang'ombe industrial area. Massive trucks, bad roads, slow movement.
     {
         "id": "changombe_road",
         "name": "Chang'ombe Road (Temeke)",
@@ -179,8 +175,6 @@ ROADS = [
         "end": "-6.8550,39.2650",
         "dist": 2.5,
     },
-    # --- THE INNER-CITY GRIDLOCKS ---
-    # Morocco is a massive intersection where Ali Hassan Mwinyi meets Kawawa Road. Pure chaos at 5:30 PM.
     {
         "id": "morocco_intersection",
         "name": "Kawawa Rd (Morocco to Kinondoni)",
@@ -188,7 +182,6 @@ ROADS = [
         "end": "-6.7950,39.2580",
         "dist": 2.0,
     },
-    # Kigogo roundabout connects the Magomeni area to Ilala. It floods easily and is a massive bottleneck.
     {
         "id": "kigogo_roundabout",
         "name": "Kawawa Rd (Kigogo Choke)",
@@ -196,7 +189,6 @@ ROADS = [
         "end": "-6.8220,39.2500",
         "dist": 1.5,
     },
-    # Fire/United Nations Road is the primary exit out of the CBD towards Upanga.
     {
         "id": "fire_upanga",
         "name": "UN Road (Fire to Upanga)",
@@ -204,8 +196,6 @@ ROADS = [
         "end": "-6.8020,39.2720",
         "dist": 1.2,
     },
-    # --- THE SUBURBAN FEEDER TRAPS ---
-    # Mwai Kibaki road (formerly Old Bagamoyo) is heavily used by Kawe/Mikocheni residents to bypass the main highway.
     {
         "id": "mwai_kibaki",
         "name": "Mwai Kibaki Rd (Kawe to Mikocheni)",
@@ -213,7 +203,6 @@ ROADS = [
         "end": "-6.7650,39.2500",
         "dist": 3.5,
     },
-    # Sinza is a commercial hub with narrow roads, lots of bars, and unpredictable parking. Always jammed at night.
     {
         "id": "sinza_mori",
         "name": "Sinza Road (Mori to Bamaga)",
@@ -221,7 +210,6 @@ ROADS = [
         "end": "-6.7700,39.2450",
         "dist": 2.0,
     },
-    # Goba road is rapidly developing. Everyone moving out of the city center lives here now, and the roads can't handle it.
     {
         "id": "goba_massana",
         "name": "Goba Road (Massana to Goba Center)",
@@ -289,15 +277,15 @@ def update_smart_city(road, weather):
         # 🛡️ THE PYDANTIC BOUNCER: Validate the data before it touches the database
         validated_data = TrafficSchema(**raw_data).model_dump()
 
-        # Once validated, append the Firestore timestamp (which changes dynamically)
+        # Once validated, append the Firestore timestamp
         validated_data["timestamp"] = firestore.SERVER_TIMESTAMP
 
         # HOT STORAGE
         db.collection("live_traffic").document(road["id"]).set(validated_data)
-        # COLD STORAGE
+        # COLD STORAGE (Kept in Firebase so you don't lose history!)
         db.collection("traffic_history").add(validated_data)
 
-        logging.info(f"Firebase Synced | {road['name']}: {status} (+{delay_m}m)")
+        logging.info(f"✅ Firebase Synced | {road['name']}: {status} (+{delay_m}m)")
 
     except ValidationError as e:
         # If Pydantic catches a bad data type, it throws a ValidationError to stop the upload
@@ -309,7 +297,7 @@ def update_smart_city(road, weather):
 
 
 # ---------------------------------------------------------
-# 6. MAIN EXECUTION (CONCURRENT UPGRADE)
+# 6. MAIN EXECUTION (CONCURRENT)
 # ---------------------------------------------------------
 if __name__ == "__main__":
     logging.info("Booting Smart City Engine with Pydantic Validation...")
