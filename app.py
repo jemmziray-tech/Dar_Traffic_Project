@@ -9,6 +9,10 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load Environment Variables securely
+load_dotenv()
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -100,7 +104,6 @@ def get_live_data():
         row["id"] = doc.id
         coords = ROAD_COORDS.get(doc.id, {"lat": -6.792, "lon": 39.239})
         row["lat"], row["lon"] = coords["lat"], coords["lon"]
-        # Strict mapping logic
         row["color"] = (
             [220, 53, 69, 255]
             if row["delay_mins"] > 10
@@ -138,6 +141,46 @@ with st.sidebar:
             icon=":material/download:",
             use_container_width=True,
         )
+
+    # Historical Archive Compiler
+    with st.expander(":material/folder_zip: Full History Archive", expanded=False):
+        st.caption("Export all historical telemetry since Day 1.")
+
+        if "full_csv" not in st.session_state:
+            if st.button(
+                "Compile Database Archive",
+                icon=":material/archive:",
+                use_container_width=True,
+            ):
+                with st.spinner("Querying Firebase (This may take a moment)..."):
+                    docs = (
+                        db.collection("traffic_history")
+                        .order_by("timestamp", direction=firestore.Query.DESCENDING)
+                        .stream()
+                    )
+                    history_df = pd.DataFrame([doc.to_dict() for doc in docs])
+
+                    if not history_df.empty:
+                        st.session_state.full_csv = history_df.to_csv(
+                            index=False
+                        ).encode("utf-8")
+                        st.session_state.archive_date = datetime.now(tz).strftime(
+                            "%Y%m%d"
+                        )
+                        st.rerun()
+                    else:
+                        st.error("Database is empty.", icon=":material/error:")
+
+        if "full_csv" in st.session_state:
+            st.success("Archive Ready!", icon=":material/check_circle:")
+            st.download_button(
+                label="Download Archive.csv",
+                data=st.session_state.full_csv,
+                file_name=f"dar_traffic_full_archive_{st.session_state.archive_date}.csv",
+                mime="text/csv",
+                icon=":material/download:",
+                use_container_width=True,
+            )
 
     st.divider()
     st.caption("Architected by John Mziray")
@@ -211,12 +254,9 @@ if not df_raw.empty:
 
     st.write("")
 
-    # --- 8. MAIN DASHBOARD SPLIT (Alerts vs Feed) ---
+    # --- 8. MAIN DASHBOARD SPLIT ---
     col_alerts, col_feed = st.columns([1, 2], gap="large")
 
-    # =========================================
-    # LEFT COLUMN: System Alerts & Gemini
-    # =========================================
     with col_alerts:
         with st.container(border=True):
             st.subheader(":material/gpp_maybe: Network Status")
@@ -276,18 +316,12 @@ if not df_raw.empty:
                     icon=":material/key:",
                 )
 
-    # =========================================
-    # RIGHT COLUMN: Live Node Telemetry Feed
-    # =========================================
     with col_feed:
         st.subheader(":material/table: Live Node Telemetry Feed")
-
-        # Sort so the worst roads are at the top
         df_sorted = df_raw.sort_values(by="delay_mins", ascending=False).reset_index(
             drop=True
         )
 
-        # Display the top 9 roads in a clean 3x3 grid
         num_cols = 3
         for i in range(0, min(9, len(df_sorted)), num_cols):
             chunk = df_sorted.iloc[i : i + num_cols]

@@ -1,14 +1,15 @@
 import os
-import json
-from click import prompt
 import pandas as pd
 from datetime import datetime
 import pytz
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 import joblib
 import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load Environment Variables securely
+load_dotenv()
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -116,7 +117,6 @@ with col_ml:
         )
 
         r3, r4 = st.columns(2)
-        # Time options in 15-min increments
         time_options = [
             f"{h:02d}:{m:02d}" for h in range(6, 24) for m in (0, 15, 30, 45)
         ]
@@ -150,7 +150,6 @@ with col_ml:
         )
         exact_prediction = rf_model.predict(pred_df)[0]
 
-        # Color coding severity
         pred_color = (
             "normal"
             if exact_prediction <= 5
@@ -162,7 +161,6 @@ with col_ml:
             else ("Moderate Congestion" if exact_prediction <= 10 else "Heavy Gridlock")
         )
 
-        # Result Metrics
         st.subheader(":material/flag: Predicted Outcome")
         m1, m2 = st.columns(2)
         m1.metric(
@@ -202,14 +200,13 @@ with col_ml:
 
         curve_df["Time"] = curve_df["Hour"].apply(format_frac)
 
-        # Beautiful Plotly Area Chart
         st.markdown("**Departure Window Analysis**")
         fig = px.area(
             curve_df, x="Time", y="Predicted_Delay", template="plotly_dark", height=250
         )
         fig.update_traces(line_color="#4B8BBE", fillcolor="rgba(75, 139, 190, 0.2)")
 
-        # Add a vertical line to show the exact chosen departure time
+        # Target Trip Vertical Line marker
         fig.add_vline(
             x=target_time_str,
             line_width=2,
@@ -218,7 +215,6 @@ with col_ml:
             annotation_text="Your Trip",
             annotation_position="top right",
         )
-
         fig.update_layout(
             margin=dict(l=0, r=0, t=10, b=0),
             xaxis_title="",
@@ -234,7 +230,6 @@ with col_ml:
             icon=":material/warning:",
         )
 
-
 # =========================================
 # RIGHT COLUMN: DarTraffic Copilot (Gemini)
 # =========================================
@@ -249,7 +244,6 @@ with col_chat:
                 icon=":material/key:",
             )
         else:
-            # Initialize Chat History
             if "messages" not in st.session_state:
                 st.session_state.messages = [
                     {
@@ -258,14 +252,11 @@ with col_chat:
                     }
                 ]
 
-            # Display Chat History
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-            # Chat Input
             if prompt := st.chat_input("Ask about alternative routes or times..."):
-                # Append user message
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
@@ -273,8 +264,7 @@ with col_chat:
                 with st.chat_message("assistant"):
                     message_placeholder = st.empty()
 
-                    # 🚨 THE HACKATHON WINNER: Context-Aware Injection
-                    # We inject what the user is looking at on the left side into the AI's prompt!
+                    # Context Injection
                     context_injection = ""
                     if rf_model:
                         context_injection = f"""
@@ -292,7 +282,7 @@ with col_chat:
                     """
 
                     try:
-                        model = genai.GenerativeModel("gemini-2.5-flash")
+                        model = genai.GenerativeModel("gemini-1.5-flash")
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
                         response = model.generate_content(full_prompt)
 
