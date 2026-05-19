@@ -302,12 +302,14 @@ def update_smart_city(road, weather):
 if __name__ == "__main__":
     logging.info("Booting Smart City Engine with Pydantic Validation...")
 
-    if GOOGLE_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not GOOGLE_API_KEY:
+    # Now using MAPS_API_KEY explicitly
+    if MAPS_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not MAPS_API_KEY:
         logging.error(
-            "You forgot to configure your Google API Key (MAPS_API_KEY) in the environment or GitHub Secrets!"
+            "You forgot to configure your MAPS_API_KEY in the environment or GitHub Secrets!"
         )
     else:
-        gmaps = googlemaps.Client(key=GOOGLE_API_KEY)
+        # Handing the MAPS_API_KEY directly to the Google Maps client
+        gmaps = googlemaps.Client(key=MAPS_API_KEY)
         current_weather = get_weather()
 
         logging.info(
