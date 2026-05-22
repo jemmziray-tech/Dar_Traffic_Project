@@ -303,7 +303,7 @@ if not df_raw.empty:
                 ):
                     with st.spinner("Analyzing macro-level routing data..."):
                         try:
-                            prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets advising them on current conditions. No markdown."
+                            prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
                             #  UPDATED TO 3.5 FLASH HERE
                             response = genai.GenerativeModel(
                                 "gemini-3.5-flash"
