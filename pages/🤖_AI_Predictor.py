@@ -8,38 +8,42 @@ import joblib
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# --- Load Environment Variables securely ---
+# --- 0. SECURE ENVIRONMENT INITIALIZATION ---
 load_dotenv()
 
-# --- 1. Setup Page Config ---
+# --- 1. PAGE CONFIGURATION & CSS ---
 st.set_page_config(
     page_title="AI Route Predictor",
     layout="wide",
     page_icon=":material/online_prediction:",
 )
 
-# --- CUSTOM CSS ---
 st.markdown(
     """
 <style>
-div[data-testid="stMetricValue"] { font-weight: 600; letter-spacing: -0.5px; }
-.block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+/* Enterprise Typography & Spacing */
+div[data-testid="stMetricValue"] { font-weight: 700; letter-spacing: -0.5px; color: #E0E0E0; }
+.block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 95%; }
 .stChatInput { padding-bottom: 20px; }
+/* Subtle glow for critical metrics */
+[data-testid="stMetricDelta"] { font-weight: 600; }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
 
-# --- 2. System Initialization ---
+# --- 2. CORE SYSTEM INITIALIZATION ---
 @st.cache_resource
 def load_ml_model():
+    """Loads the Scikit-Learn model from disk, cached for performance."""
     if os.path.exists("traffic_model.pkl"):
         return joblib.load("traffic_model.pkl")
     return None
 
 
 def init_genai():
+    """Initializes Gemini AI using secure environment variables."""
     gemini_key = os.getenv("GEMINI_API_KEY") or (
         st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None
     )
@@ -53,7 +57,7 @@ rf_model = load_ml_model()
 genai_active = init_genai()
 tz = pytz.timezone("Africa/Dar_es_Salaam")
 
-# ROAD DICTIONARY (Friendly Names to IDs)
+# --- 3. MASTER ROAD DICTIONARY ---
 ROAD_MAP = {
     "ubungo": "Morogoro Rd (Ubungo)",
     "mwenge": "Bagamoyo Rd (Mwenge)",
@@ -79,22 +83,23 @@ ROAD_MAP = {
 }
 REVERSE_ROAD_MAP = {v: k for k, v in ROAD_MAP.items()}
 
-# --- 3. UI HEADER ---
+# --- 4. HEADER UI ---
 st.title(":material/explore: AI Commute Predictor & Copilot")
 st.caption(
-    "Plan your journey using our Scikit-Learn prediction engine and consult the AI Copilot for logistics advice."
+    "Plan your journey using our Scikit-Learn prediction engine and consult the Gemini AI Copilot for logistics advice."
 )
 st.divider()
 
-# --- 4. 60/40 SPLIT LAYOUT ---
+# --- 5. ASYMMETRIC DASHBOARD LAYOUT (60/40) ---
 col_ml, col_chat = st.columns([1.5, 1], gap="large")
 
-# =========================================
-# LEFT COLUMN: Deterministic Routing Engine
-# =========================================
+# =========================================================
+# LEFT COLUMN (60%): DETERMINISTIC ROUTING ENGINE
+# =========================================================
 with col_ml:
     st.subheader(":material/fork_right: Trip Parameters")
 
+    # Input Form
     with st.container(border=True):
         r1, r2 = st.columns(2)
         target_road_name = r1.selectbox(
@@ -135,11 +140,10 @@ with col_ml:
     st.write("")
 
     if rf_model:
-        # 1. Convert Time to Decimal for Model (e.g., 08:30 -> 8.5)
+        # A. Mathematics & Prediction
         h, m = map(int, target_time_str.split(":"))
-        target_fraction = h + (m / 60.0)
+        target_fraction = h + (m / 60.0)  # Converts 08:30 to 8.5
 
-        # 2. Make Exact Prediction
         pred_df = pd.DataFrame(
             {
                 "road_id": [target_road_id],
@@ -161,7 +165,7 @@ with col_ml:
             else ("Moderate Congestion" if exact_prediction <= 10 else "Heavy Gridlock")
         )
 
-        # 3. Dynamic Confidence Score fetching
+        # B. Dynamic Confidence Score
         confidence_score = "Active"
         try:
             if os.path.exists("model_metrics.csv"):
@@ -170,9 +174,9 @@ with col_ml:
                 if pd.notna(latest_r2):
                     confidence_score = f"{latest_r2 * 100:.1f}% R²"
         except Exception:
-            pass
+            pass  # Fail gracefully, ensuring the app never crashes
 
-        # 4. Result Metrics
+        # C. Metric Display
         st.subheader(":material/flag: Predicted Outcome")
         m1, m2 = st.columns(2)
         m1.metric(
@@ -188,7 +192,7 @@ with col_ml:
             delta_color="normal",
         )
 
-        # 5. Generate the Time-Curve with NUMERIC Data
+        # D. Time-Shift Curve Generation
         start_frac = max(6.0, target_fraction - 1.5)
         end_frac = min(23.75, target_fraction + 1.5)
         curve_hours = [
@@ -206,14 +210,13 @@ with col_ml:
         )
         curve_df["Predicted_Delay"] = rf_model.predict(curve_df)
 
-        # Helper to create formatted hover strings
         def format_frac(f):
             hr, mn = int(f), int(round((f - int(f)) * 60))
             return f"{hr:02d}:{mn:02d}"
 
         curve_df["Time_Label"] = curve_df["Hour"].apply(format_frac)
 
-        # 6. Build the mathematically safe Plotly chart
+        # E. Beautiful Plotly Area Chart (Mathematically Safe)
         st.markdown("**Departure Window Analysis**")
         fig = px.area(
             curve_df,
@@ -221,12 +224,10 @@ with col_ml:
             y="Predicted_Delay",
             hover_data={"Time_Label": True, "Hour": False},
             template="plotly_dark",
-            height=250,
+            height=260,
         )
 
-        fig.update_traces(line_color="#4B8BBE", fillcolor="rgba(75, 139, 190, 0.2)")
-
-        # Add a vertical line using the decimal number, NOT the string
+        fig.update_traces(line_color="#4B8BBE", fillcolor="rgba(75, 139, 190, 0.25)")
         fig.add_vline(
             x=target_fraction,
             line_width=2,
@@ -236,7 +237,6 @@ with col_ml:
             annotation_position="top right",
         )
 
-        # Format the X-axis to display strings instead of decimals
         fig.update_layout(
             margin=dict(l=0, r=0, t=10, b=0),
             xaxis_title="",
@@ -253,38 +253,41 @@ with col_ml:
 
     else:
         st.error(
-            "Predictive Model Offline: traffic_model.pkl not found in root directory.",
+            "Predictive Model Offline: traffic_model.pkl not found.",
             icon=":material/warning:",
         )
 
 
-# =========================================
-# RIGHT COLUMN: DarTraffic Copilot (Gemini)
-# =========================================
+# =========================================================
+# RIGHT COLUMN (40%): DARTRAFFIC COPILOT (GEMINI 2.5)
+# =========================================================
 with col_chat:
     st.subheader(":material/robot_2: DarTraffic Copilot")
-    st.caption("Ask questions about routes, alternatives, or logistics.")
+    st.caption("Ask our AI about alternatives, wait times, or strategy.")
 
-    with st.container(border=True, height=520):
+    with st.container(border=True, height=530):
         if not genai_active:
             st.info(
                 "Configure GEMINI_API_KEY in environment to activate Copilot.",
                 icon=":material/key:",
             )
         else:
+            # Initialize Chat Memory
             if "messages" not in st.session_state:
                 st.session_state.messages = [
                     {
                         "role": "assistant",
-                        "content": "Hello! I am your data-driven AI Traffic Assistant. Ask me about alternative routes for your planned trip.",
+                        "content": "Hello! I am your AI Logistics Assistant. Ask me if you should reroute or delay your departure.",
                     }
                 ]
 
+            # Render Chat History
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-            if prompt := st.chat_input("E.g., Can I shift to Mandela Rd instead?"):
+            # Input Prompt
+            if prompt := st.chat_input("E.g., Should I wait an hour or go now?"):
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
@@ -292,10 +295,10 @@ with col_chat:
                 with st.chat_message("assistant"):
                     message_placeholder = st.empty()
 
-                    # 🚨 THE HACKATHON WINNER: THE SHADOW INTELLIGENCE FEED
+                    # 🚨 THE HACKATHON WINNER: SPATIAL + TEMPORAL MATRIX INJECTION
                     context_injection = ""
                     if rf_model:
-                        # 1. Instantly predict the traffic for ALL 21 roads at the selected time
+                        # 1. SPATIAL MATRIX: All 21 roads at the exact selected time
                         all_roads = list(REVERSE_ROAD_MAP.values())
                         city_df = pd.DataFrame(
                             {
@@ -307,20 +310,28 @@ with col_chat:
                         )
                         city_df["Predicted_Delay"] = rf_model.predict(city_df)
 
-                        # 2. Format it into a clean data feed for the AI
                         city_status = ""
                         for _, row in city_df.iterrows():
                             friendly_name = ROAD_MAP[row["road_id"]]
                             city_status += f"- {friendly_name}: {row['Predicted_Delay']:.1f} mins\n"
 
-                        # 3. Inject it into the AI's brain
+                        # 2. TEMPORAL MATRIX: The user's target road over a 3-hour window
+                        time_trend = ""
+                        if "curve_df" in locals():
+                            for _, row in curve_df.iterrows():
+                                time_trend += f"- {row['Time_Label']}: {row['Predicted_Delay']:.1f} mins\n"
+
+                        # 3. Injecting the Brain
                         context_injection = f"""
                         [SYSTEM DATA FEED]
                         The user is evaluating a departure on {target_day} at {target_time_str} under {target_weather} conditions.
                         Their Primary Route: '{target_road_name}' (Predicted Delay: {exact_prediction:.1f} mins).
 
-                        CITY-WIDE PREDICTIVE TELEMETRY FOR THIS EXACT TIME:
+                        1. CITY-WIDE ALTERNATIVES (At exactly {target_time_str}):
                         {city_status}
+
+                        2. TIME-SHIFT PREDICTIONS FOR PRIMARY ROUTE ('{target_road_name}'):
+                        {time_trend}
                         """
 
                     system_prompt = f"""
@@ -328,13 +339,14 @@ with col_chat:
                     {context_injection}
                     
                     [STRICT DIRECTIVES]
-                    1. NEVER give generic, memorized advice (e.g., "Mandela road is usually busy"). 
-                    2. If the user asks about an alternative road, you MUST look at the telemetry feed above and quote the EXACT predicted minutes for that alternative road.
-                    3. Compare the alternative directly to their Primary Route to tell them mathematically if it's a faster choice.
+                    1. NEVER claim you cannot predict the future. You have the exact predictive time-shift data in the feed above.
+                    2. If the user asks about shifting to another road, use the CITY-WIDE ALTERNATIVES feed to compare delays mathematically.
+                    3. If the user asks if they should "wait" or "leave later", use the TIME-SHIFT PREDICTIONS feed. Tell them exactly what the delay will be at the specific times in the feed.
                     4. Keep your answer concise, corporate, and highly analytical. Maximum 3 to 4 sentences.
                     """
 
                     try:
+                        # Powered by Gemini 2.5 Flash
                         model = genai.GenerativeModel("gemini-2.5-flash")
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
                         response = model.generate_content(full_prompt)
