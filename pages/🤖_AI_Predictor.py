@@ -295,7 +295,6 @@ with col_chat:
                 with st.chat_message("assistant"):
                     message_placeholder = st.empty()
 
-                    # 🚨 THE HACKATHON WINNER: SPATIAL + TEMPORAL MATRIX INJECTION
                     context_injection = ""
                     if rf_model:
                         # 1. SPATIAL MATRIX: All 21 roads at the exact selected time
@@ -347,7 +346,7 @@ with col_chat:
 
                     try:
                         # Powered by Gemini 2.5 Flash
-                        model = genai.GenerativeModel("gemini-2.5-flash")
+                        model = genai.GenerativeModel("gemini-3.5-flash")
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
                         response = model.generate_content(full_prompt)
 
