@@ -1,19 +1,24 @@
 import os
 import csv
 import json
-from datetime import datetime
+import numpy as np
 import pandas as pd
 import joblib
+from datetime import datetime
+
+# Firebase
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+# Scikit-Learn & Advanced ML
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, r2_score
+import category_encoders as ce
+from xgboost import XGBRegressor
 
-print("🚀 Booting Advanced Enterprise AI Training Pipeline...")
+print("🚀 Booting Advanced Enterprise AI Training Pipeline (V3 XGBoost + Velocity)...")
 
 # --- 1. Define Target Roads ---
 TARGET_ROADS = [
@@ -37,7 +42,7 @@ TARGET_ROADS = [
     "fire_upanga",
     "mwai_kibaki",
     "sinza_mori",
-    "goba_massana"
+    "goba_massana",
 ]
 
 # --- 2. Connect to Firebase & Fetch Data ---
@@ -66,72 +71,100 @@ if df.empty:
     print("❌ CRITICAL ERROR: No data found in Firebase. Exiting pipeline.")
     exit(1)
 
-# Filter the data to ONLY include our 10 target roads
+# Filter the data to ONLY include our target roads
 df = df[df["road_id"].isin(TARGET_ROADS)]
 
 print(f"✅ Extracted {len(df)} total rows of raw data.")
 
-# --- 3. Advanced Data Cleaning & Outlier Rejection ---
+# --- 3. Advanced Feature Engineering & Sanitization ---
 print("⚙️ Executing Data Sanitization & Feature Engineering...")
 
-# 🛡️ OUTLIER REJECTION: Drop impossible delays (e.g., API glitches > 3 hours)
-# This prevents the AI from learning garbage data
+# 🛡️ OUTLIER REJECTION: Drop impossible delays (API glitches > 3 hours)
 initial_row_count = len(df)
 df = df[df["delay_mins"] <= 180]
-if len(df) < initial_row_count:
-    print(
-        f"🗑️ Removed {initial_row_count - len(df)} corrupted outlier records (delays > 3 hours)."
-    )
-
-# Clean negative delays (just in case they slipped past the Pydantic scraper)
 df["delay_mins"] = df["delay_mins"].clip(lower=0)
+if len(df) < initial_row_count:
+    print(f"🗑️ Removed {initial_row_count - len(df)} corrupted outlier records.")
 
+# 🕒 TEMPORAL ENGINEERING
 df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_convert("Africa/Dar_es_Salaam")
-df["Hour"] = df["timestamp"].dt.hour + (df["timestamp"].dt.minute / 60.0)
-df["Day"] = df["timestamp"].dt.day_name()
-df["Condition"] = df["weather"].apply(
-    lambda x: x.split(", ")[1] if isinstance(x, str) and ", " in x else "Clear"
+df["hour"] = df["timestamp"].dt.hour
+df["day_of_week"] = df["timestamp"].dt.dayofweek
+df["is_weekend"] = df["day_of_week"].apply(lambda x: 1 if x >= 5 else 0)
+# Define Dar es Salaam Rush Hours (7-9 AM, 4-7 PM)
+df["is_rush_hour"] = df["hour"].apply(lambda x: 1 if x in [7, 8, 16, 17, 18, 19] else 0)
+
+# ⛈️ WEATHER ENGINEERING (Extracting text into math)
+df["temp_c"] = df["weather"].astype(str).str.extract(r"([0-9.]+)").astype(float)
+df["temp_c"] = df["temp_c"].fillna(25.0)  # Default to 25C if sensor fails
+df["condition"] = df["weather"].apply(
+    lambda x: str(x).split(", ")[1] if ", " in str(x) else "Clear"
 )
+df["is_raining"] = df["condition"].apply(lambda x: 1 if "Rain" in str(x) else 0)
 
-X = df[["road_id", "Hour", "Day", "Condition"]]
+# 🌪️ TRAFFIC VELOCITY ENGINEERING (The V3 Upgrade)
+print("🌪️ Calculating 20-Minute Traffic Velocity (Delta)...")
+# Sort chronologically so we can compare a row to the row exactly 20 mins prior
+df = df.sort_values(by=["road_id", "timestamp"])
+df["previous_delay"] = df.groupby("road_id")["delay_mins"].shift(1)
+# Calculate momentum: positive = getting worse, negative = clearing
+df["delay_velocity"] = df["delay_mins"] - df["previous_delay"]
+df["delay_velocity"] = df["delay_velocity"].fillna(0)  # Fill first rows with 0
+
+
+# Define our features.
+features = [
+    "road_id",
+    "hour",
+    "day_of_week",
+    "is_weekend",
+    "is_rush_hour",
+    "temp_c",
+    "is_raining",
+    "delay_velocity",
+]
+X = df[features]
 y = df["delay_mins"]
-
-if len(df) < 500:
-    print(
-        f"⚠️ Warning: Dataset is very small ({len(df)} rows). Anti-Overfitting protocols engaged."
-    )
 
 # --- 4. Build the Enterprise Machine Learning Pipeline ---
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
+# 🎯 SAMPLE WEIGHTING: Force the AI to care 5x more about severe gridlocks (>15 mins)
+train_weights = np.where(y_train > 15, 5.0, 1.0)
+
+# 🧮 PREPROCESSOR: Target Encoding for roads, Passthrough for numbers
 preprocessor = ColumnTransformer(
     transformers=[
-        ("num", "passthrough", ["Hour"]),
         (
-            "cat",
-            OneHotEncoder(handle_unknown="ignore"),
-            ["road_id", "Day", "Condition"],
+            "num",
+            "passthrough",
+            [
+                "hour",
+                "day_of_week",
+                "is_weekend",
+                "is_rush_hour",
+                "temp_c",
+                "is_raining",
+                "delay_velocity",
+            ],
         ),
+        ("cat", ce.TargetEncoder(), ["road_id"]),
     ]
 )
 
-# 🧠 ANTI-OVERFITTING AI CORE
-# n_estimators=150: Creates 150 separate decision trees for better accuracy
-# max_depth=20: Stops trees from memorizing the data (prevents the -324 min glitch)
-# min_samples_leaf=2: Requires at least 2 data points to make a conclusion
-# n_jobs=-1: Uses maximum server CPU power
+# ⚡ XGBOOST CORE
 model_pipeline = Pipeline(
     steps=[
         ("preprocessor", preprocessor),
         (
             "regressor",
-            RandomForestRegressor(
-                n_estimators=150,
-                max_depth=20,
-                min_samples_split=4,
-                min_samples_leaf=2,
+            XGBRegressor(
+                n_estimators=500,
+                learning_rate=0.05,
+                max_depth=6,
+                subsample=0.8,
                 random_state=42,
                 n_jobs=-1,
             ),
@@ -140,8 +173,9 @@ model_pipeline = Pipeline(
 )
 
 # --- 5. Train, Evaluate, and Save ---
-print("🧠 Training the Advanced Random Forest AI Engine...")
-model_pipeline.fit(X_train, y_train)
+print("🧠 Training the XGBoost AI Engine with Sample Weights...")
+# We pass the sample weights directly into the XGBoost step of the pipeline
+model_pipeline.fit(X_train, y_train, regressor__sample_weight=train_weights)
 
 predictions = model_pipeline.predict(X_test)
 mae = mean_absolute_error(y_test, predictions)
@@ -149,11 +183,11 @@ r2 = r2_score(y_test, predictions)
 
 print("=" * 40)
 print(f"🎯 Global MAE: Off by {mae:.2f} minutes.")
-print(f"🎯 Model R² Score: {r2:.2f}")
+print(f"🎯 Model R² Score: {r2:.3f}")
 print("=" * 40)
 
 joblib.dump(model_pipeline, "traffic_model.pkl")
-print("💾 Securely saved 'traffic_model.pkl'!")
+print("💾 Securely saved 'traffic_model.pkl'! (Overwritten with V3 Brain)")
 
 # --- 6. Save Metrics to Track MLOps Drift ---
 print("📈 Logging MLOps drift metrics...")
@@ -167,6 +201,6 @@ with open(metrics_file, mode="a", newline="", encoding="utf-8") as file:
         writer.writerow(["Date", "Total_Rows_Trained", "MAE_Minutes", "R2_Score"])
 
     today_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    writer.writerow([today_date, len(df), round(mae, 2), round(r2, 2)])
+    writer.writerow([today_date, len(df), round(mae, 2), round(r2, 3)])
 
 print("✅ Pipeline execution fully complete!")
