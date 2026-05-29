@@ -220,27 +220,41 @@ ROADS = [
 
 
 # ---------------------------------------------------------
-# 4. WEATHER ENGINE
+# 4. MICRO-CLIMATE WEATHER ENGINE
 # ---------------------------------------------------------
-def get_weather():
-    url = "https://api.open-meteo.com/v1/forecast?latitude=-6.7978&longitude=39.2201&current_weather=true"
+def get_localized_weather(lat: float, lon: float) -> str:
+    """Fetches micro-climate weather data for specific road coordinates using Open-Meteo."""
     try:
-        # 🚨 FIXED: Added a strict 10-second timeout to prevent infinite hanging
-        data = requests.get(url, timeout=10).json()
-        temp = data["current_weather"]["temperature"]
-        code = data["current_weather"]["weathercode"]
-        condition = "Clear" if code <= 3 else "Rainy" if code >= 51 else "Cloudy"
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,rain&timezone=Africa%2FDar_es_Salaam"
+        
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+
+        temp = data["current"]["temperature_2m"]
+        rain = data["current"]["rain"]
+
+        # If rain is greater than 0mm, classify as Rain
+        condition = "Rain" if rain > 0 else "Clear"
+        
         return f"{temp}°C, {condition}"
+        
     except Exception as e:
-        logging.error(f"Weather API Error: {e}")
-        return "Unknown Weather"
+        logging.error(f"🌤️ Localized Weather API failed for {lat},{lon}: {e}")
+        # Safe fallback so the scraper doesn't crash if the weather API goes down
+        return "25.0°C, Clear" 
 
 
 # ---------------------------------------------------------
 # 5. TRAFFIC ENGINE & FIREBASE SYNC
 # ---------------------------------------------------------
-def update_smart_city(road, weather):
+def update_smart_city(road):
     try:
+        # 1. Fetch Localized Weather for THIS specific road
+        start_lat, start_lon = road["start"].split(",")
+        local_weather = get_localized_weather(float(start_lat.strip()), float(start_lon.strip()))
+
+        # 2. Fetch Google Maps Traffic
         result = gmaps.distance_matrix(
             origins=road["start"],
             destinations=road["end"],
@@ -271,7 +285,7 @@ def update_smart_city(road, weather):
             "delay_mins": delay_m,
             "speed_kmh": speed,
             "status": status,
-            "weather": weather,
+            "weather": local_weather, # Localized micro-climate injected here!
         }
 
         # 🛡️ THE PYDANTIC BOUNCER: Validate the data before it touches the database
@@ -285,7 +299,7 @@ def update_smart_city(road, weather):
         # COLD STORAGE (Kept in Firebase so you don't lose history!)
         db.collection("traffic_history").add(validated_data)
 
-        logging.info(f"✅ Firebase Synced | {road['name']}: {status} (+{delay_m}m)")
+        logging.info(f"✅ Firebase Synced | {road['name']}: {status} (+{delay_m}m) | {local_weather}")
 
     except ValidationError as e:
         # If Pydantic catches a bad data type, it throws a ValidationError to stop the upload
@@ -300,7 +314,7 @@ def update_smart_city(road, weather):
 # 6. MAIN EXECUTION (CONCURRENT)
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    logging.info("Booting Smart City Engine with Pydantic Validation...")
+    logging.info("Booting Smart City Engine with Pydantic Validation & Micro-Climate Engine...")
 
     # Now using MAPS_API_KEY explicitly
     if MAPS_API_KEY == "YOUR_GOOGLE_API_KEY_HERE" or not MAPS_API_KEY:
@@ -310,16 +324,14 @@ if __name__ == "__main__":
     else:
         # Handing the MAPS_API_KEY directly to the Google Maps client
         gmaps = googlemaps.Client(key=MAPS_API_KEY)
-        current_weather = get_weather()
 
         logging.info(
             "Initiating high-speed concurrent scraping (ThreadPoolExecutor)..."
         )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [
-                executor.submit(update_smart_city, r, current_weather) for r in ROADS
-            ]
+            # Notice we no longer pass 'current_weather' into the function, it handles it internally!
+            futures = [executor.submit(update_smart_city, r) for r in ROADS]
             concurrent.futures.wait(futures)
 
         logging.info("Sync Complete!")
