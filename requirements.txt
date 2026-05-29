@@ -12,3 +12,5 @@ google-generativeai>=0.8.0
 numpy>=1.26.0
 pytz
 joblib
+category_encoders>=2.6.0
+xgboost>=2.0.0
