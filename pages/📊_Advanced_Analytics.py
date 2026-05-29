@@ -132,24 +132,63 @@ tab_overview, tab_dynamics, tab_validation = st.tabs([
 # ==========================================
 with tab_overview:
     st.subheader(":material/calendar_view_week: Temporal Congestion Matrix")
-    st.markdown("<p style='color:#A0A0A0; font-size: 0.9rem;'>Visualizing Dar es Salaam gridlock patterns by day and hour.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#A0A0A0; font-size: 0.9rem;'>Visualizing Dar es Salaam gridlock patterns during active operational hours (06:00 - 22:00).</p>", unsafe_allow_html=True)
 
+    # 1. Calculate the averages
     heat_df = df.groupby(['Day_Name', 'hour'])['delay_mins'].mean().reset_index()
+
+    # 2. THE FIX: Crop out the 'Dead Zones'
+    heat_df = heat_df[(heat_df['hour'] >= 6) & (heat_df['hour'] <= 22)]
+
+    # 3. Format the X-Axis to look like a sleek military/logistics timeline (e.g., "06:00", "14:00")
+    heat_df['Hour_Label'] = heat_df['hour'].apply(lambda x: f"{x:02d}:00")
+
+    # Force the exact structural order of the axes
     day_order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    hour_order = [f"{h:02d}:00" for h in range(6, 23)]
 
     fig_heat = px.density_heatmap(
-        heat_df, x="hour", y="Day_Name", z="delay_mins",
+        heat_df, 
+        x="Hour_Label", 
+        y="Day_Name", 
+        z="delay_mins",
         histfunc="avg",
-        color_continuous_scale="RdYlGn_r", 
-        category_orders={"Day_Name": day_order[::-1]}, 
-        labels={"hour": "Hour of Day", "Day_Name": "Day of Week", "delay_mins": "Avg Delay (Mins)"}
+        color_continuous_scale="RdYlGn_r", # Traffic Light Scale
+        category_orders={
+            "Day_Name": day_order[::-1], # Keep Monday at the top
+            "Hour_Label": hour_order     # Lock the horizontal timeline
+        }, 
+        labels={"Hour_Label": "Time of Day", "Day_Name": "Day of Week", "delay_mins": "Avg Delay (Mins)"}
     )
+    
+    # 4. Premium UI Styling for the Matrix
     fig_heat.update_layout(
         template="plotly_dark", 
         height=450, 
         margin=dict(t=20, b=20, l=0, r=0),
-        xaxis=dict(tickmode='linear', tick0=0, dtick=1)
+        xaxis=dict(
+            side="bottom", 
+            tickangle=0, 
+            showgrid=False,
+            title_font=dict(color="#A0A0A0"),
+            tickfont=dict(color="#E0E0E0")
+        ),
+        yaxis=dict(
+            showgrid=False,
+            title_font=dict(color="#A0A0A0"),
+            tickfont=dict(color="#E0E0E0", size=13)
+        ),
+        # Sleek, thinned-out colorbar legend
+        coloraxis_colorbar=dict(
+            title="Delay",
+            thicknessmode="pixels", thickness=12,
+            lenmode="pixels", len=300,
+            yanchor="middle", y=0.5,
+            tickfont=dict(color="#A0A0A0")
+        )
     )
+    
+    # Render to Streamlit
     st.plotly_chart(fig_heat, use_container_width=True)
 
 # ==========================================
