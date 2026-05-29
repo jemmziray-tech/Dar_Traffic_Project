@@ -15,12 +15,27 @@ st.set_page_config(
     page_title="Advanced Analytics", page_icon=":material/analytics:", layout="wide"
 )
 
-st.title(":material/query_stats: Enterprise Traffic Intelligence")
-st.markdown(
-    "Deep-dive business intelligence, unsupervised spatial clustering, and ML validation analysis."
-)
+# --- 2. MODERN UI CSS INJECTION ---
+st.markdown("""
+<style>
+    .metric-card {
+        background-color: #1E1E1E;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #4B8BBE;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .metric-title { color: #A0A0A0; font-size: 0.9rem; text-transform: uppercase; font-weight: 600; margin-bottom: 5px;}
+    .metric-value { color: #FFFFFF; font-size: 1.8rem; font-weight: bold; margin: 0;}
+    hr { border-color: #333333; }
+</style>
+""", unsafe_allow_html=True)
 
-# --- 2. SECURE FIREBASE CONNECTION ---
+st.title("📊 Enterprise Traffic Intelligence")
+st.markdown("<p style='color:#A0A0A0; font-size: 1.1rem;'>Deep-dive business intelligence, spatial clustering, and ML validation analysis.</p>", unsafe_allow_html=True)
+st.write("") # Spacer
+
+# --- 3. SECURE FIREBASE CONNECTION ---
 @st.cache_resource
 def get_db():
     if not firebase_admin._apps:
@@ -33,7 +48,7 @@ def get_db():
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
-# --- 3. DATA FETCHING & V3 TRANSLATION LAYER ---
+# --- 4. DATA FETCHING & V3 TRANSLATION LAYER ---
 @st.cache_data(ttl=600) # Cache for 10 minutes
 def load_historical_data():
     db = get_db()
@@ -43,11 +58,7 @@ def load_historical_data():
     if df.empty:
         return df
 
-    # ==========================================
-    # V3 FEATURE ENGINEERING TRANSLATION LAYER
-    # ==========================================
-    
-    # 1. Temporal Engineering
+    # --- V3 FEATURE ENGINEERING TRANSLATION LAYER ---
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     if df["timestamp"].dt.tz is None:
         df["timestamp"] = df["timestamp"].dt.tz_localize("UTC").dt.tz_convert("Africa/Dar_es_Salaam")
@@ -59,13 +70,17 @@ def load_historical_data():
     df["is_weekend"] = df["day_of_week"].apply(lambda x: 1 if x >= 5 else 0)
     df["is_rush_hour"] = df["hour"].apply(lambda x: 1 if x in [7, 8, 16, 17, 18, 19] else 0)
 
-    # 2. Weather Engineering
+    # Human-readable Day for the Heatmap
+    day_map = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}
+    df['Day_Name'] = df['day_of_week'].map(day_map)
+
+    # Weather Engineering
     df["temp_c"] = df["weather"].astype(str).str.extract(r'([0-9.]+)').astype(float)
     df["temp_c"] = df["temp_c"].fillna(25.0) 
     df["condition"] = df["weather"].apply(lambda x: str(x).split(", ")[1] if ", " in str(x) else "Clear")
     df["is_raining"] = df["condition"].apply(lambda x: 1 if "Rain" in str(x) else 0)
 
-    # 3. Traffic Velocity Engineering (The Delta)
+    # Traffic Velocity Engineering
     df = df.sort_values(by=["road_id", "timestamp"])
     df["previous_delay"] = df.groupby("road_id")["delay_mins"].shift(1)
     df["delay_velocity"] = df["delay_mins"] - df["previous_delay"]
@@ -79,38 +94,94 @@ if df.empty:
     st.error("No telemetry data found in the database. Please check your scraper.")
     st.stop()
 
-# --- 4. DASHBOARD VISUALIZATIONS ---
+
+# --- 5. EXECUTIVE KPI CARDS ---
+kpi1, kpi2, kpi3 = st.columns(3)
+with kpi1:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Total Telemetry Points</div>
+        <div class="metric-value">{len(df):,}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with kpi2:
+    st.markdown(f"""
+    <div class="metric-card" style="border-left-color: #F6C85F;">
+        <div class="metric-title">City-Wide Avg Delay</div>
+        <div class="metric-value">{df['delay_mins'].mean():.1f} mins</div>
+    </div>
+    """, unsafe_allow_html=True)
+with kpi3:
+    worst_road = df.groupby('road_id')['delay_mins'].mean().idxmax()
+    worst_delay = df.groupby('road_id')['delay_mins'].mean().max()
+    st.markdown(f"""
+    <div class="metric-card" style="border-left-color: #FF4B4B;">
+        <div class="metric-title">Primary Bottleneck</div>
+        <div class="metric-value">{worst_road.replace('_', ' ').title()}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.write("<br>", unsafe_allow_html=True) # Spacer
+
+# --- 6. THE INTUITIVE HEATMAP ---
+st.subheader("🔥 Temporal Congestion Heatmap")
+st.markdown("Visualizing Dar es Salaam gridlock patterns by day and hour. **(Red = Heavy Delay, Green = Smooth Flow)**")
+
+heat_df = df.groupby(['Day_Name', 'hour'])['delay_mins'].mean().reset_index()
+day_order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+fig_heat = px.density_heatmap(
+    heat_df, x="hour", y="Day_Name", z="delay_mins",
+    histfunc="avg",
+    color_continuous_scale="RdYlGn_r", # Reverse Red-Yellow-Green (Traffic light colors!)
+    category_orders={"Day_Name": day_order[::-1]}, # Reverse so Monday is at the top
+    labels={"hour": "Hour of Day", "Day_Name": "Day of Week", "delay_mins": "Avg Delay (Mins)"}
+)
+fig_heat.update_layout(
+    template="plotly_dark", 
+    height=400, 
+    margin=dict(t=20, b=20, l=0, r=0),
+    xaxis=dict(tickmode='linear', tick0=0, dtick=1)
+)
+st.plotly_chart(fig_heat, use_container_width=True)
+
+st.divider()
+
+# --- 7. ADVANCED VISUALIZATIONS (SIDE-BY-SIDE) ---
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Traffic Velocity (Momentum) by Hour")
-    # Using the new velocity feature to show if traffic is getting better or worse
+    st.subheader("🌊 Traffic Momentum (Velocity)")
+    st.markdown("Tracks how rapidly traffic is building up (+) or clearing (-).")
     fig_vel = px.line(
         df.groupby("hour")["delay_velocity"].mean().reset_index(),
         x="hour", y="delay_velocity", markers=True,
-        title="Average Change in Delay (Mins) per Hour",
-        labels={"delay_velocity": "Velocity (Mins)", "hour": "Time of Day"}
+        labels={"delay_velocity": "Velocity (Mins/20m)", "hour": "Time of Day"},
+        color_discrete_sequence=["#4B8BBE"]
     )
+    fig_vel.update_layout(template="plotly_dark", height=350, margin=dict(t=20, b=0, l=0, r=0))
     st.plotly_chart(fig_vel, use_container_width=True)
 
 with col2:
-    st.subheader("Gridlock Hotspots (Unsupervised Clustering)")
-    # Using KMeans to find hidden patterns in numbers
+    st.subheader("🧬 Gridlock Clusters (K-Means)")
+    st.markdown("Unsupervised ML identifying hidden severity clusters in the data.")
     cluster_data = df[["hour", "delay_mins", "temp_c"]].dropna()
     if not cluster_data.empty:
         kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
         df.loc[cluster_data.index, "Cluster"] = kmeans.fit_predict(cluster_data).astype(str)
         fig_cluster = px.scatter(
             df, x="hour", y="delay_mins", color="Cluster",
-            title="K-Means Pattern Recognition",
+            color_discrete_sequence=["#00CC96", "#FFA15A", "#FF4B4B"],
             labels={"hour": "Hour of Day", "delay_mins": "Delay (Mins)"}
         )
+        fig_cluster.update_layout(template="plotly_dark", height=350, margin=dict(t=20, b=0, l=0, r=0))
         st.plotly_chart(fig_cluster, use_container_width=True)
 
-# --- 5. ML VALIDATION ENGINE ---
 st.divider()
-st.subheader("🔬 AI Validation Engine")
-st.markdown("Auditing the V3 XGBoost model against live historical data.")
+
+# --- 8. ML VALIDATION ENGINE ---
+st.subheader("🔬 XGBoost V3 Validation Engine")
+st.markdown("Auditing the AI's predictive math against live historical reality.")
 
 model_path = "traffic_model.pkl"
 if os.path.exists(model_path):
@@ -118,25 +189,36 @@ if os.path.exists(model_path):
         model = joblib.load(model_path)
         
         target_road = st.selectbox("Select Artery for Validation Audit:", df["road_id"].unique())
-        df_val = df[df["road_id"] == target_road].copy()
+        df_val = df[df["road_id"] == target_road].sort_values("timestamp").copy()
         
         if not df_val.empty:
             # Feed the exact features the V3 model expects
             features = ["road_id", "hour", "day_of_week", "is_weekend", "is_rush_hour", "temp_c", "is_raining", "delay_velocity"]
             df_val["Predicted_Delay"] = model.predict(df_val[features])
-            
-            # Ensure predictions don't drop below 0 graphically
             df_val["Predicted_Delay"] = df_val["Predicted_Delay"].clip(lower=0)
 
             fig_val = go.Figure()
-            fig_val.add_trace(go.Scatter(x=df_val["timestamp"], y=df_val["delay_mins"], mode="lines", name="Actual Delay (Reality)", line=dict(color="#FF4B4B")))
-            fig_val.add_trace(go.Scatter(x=df_val["timestamp"], y=df_val["Predicted_Delay"], mode="lines", name="AI Prediction", line=dict(color="#4B8BBE", dash="dash")))
+            fig_val.add_trace(go.Scatter(
+                x=df_val["timestamp"], y=df_val["delay_mins"], 
+                mode="lines", name="Actual Delay (Reality)", 
+                line=dict(color="#FF4B4B", width=2)
+            ))
+            fig_val.add_trace(go.Scatter(
+                x=df_val["timestamp"], y=df_val["Predicted_Delay"], 
+                mode="lines", name="AI Prediction", 
+                line=dict(color="#00CC96", width=2, dash="dash")
+            ))
             
-            fig_val.update_layout(template="plotly_dark", height=350, hovermode="x unified")
+            fig_val.update_layout(
+                template="plotly_dark", height=400, 
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                margin=dict(t=20, b=0, l=0, r=0)
+            )
             st.plotly_chart(fig_val, use_container_width=True)
             
             error_margin = abs(df_val["delay_mins"] - df_val["Predicted_Delay"]).mean()
-            st.info(f"**Insight:** The V3 Engine predicts traffic for **{target_road}** with an average variance of **±{error_margin:.1f} minutes** from physical reality.")
+            st.info(f"💡 **Audit Insight:** The XGBoost Engine predicts traffic for **{target_road}** with an average absolute variance of **±{error_margin:.1f} minutes** from physical reality.")
         
     except Exception as e:
         st.error(f"Validation Engine Offline: {e}")
