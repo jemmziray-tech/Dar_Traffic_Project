@@ -61,31 +61,32 @@ st.markdown("""
 @st.cache_resource
 def get_db():
     if not firebase_admin._apps:
-        # First, try to get it from Streamlit's native secrets manager
-        if "FIREBASE_KEY_JSON" in st.secrets:
-            # Streamlit secrets handles the JSON string directly
-            firebase_secret = st.secrets["FIREBASE_KEY_JSON"]
-            try:
-                # If you pasted raw JSON into the secret box, parse it
-                cred_dict = json.loads(firebase_secret)
-                cred = credentials.Certificate(cred_dict)
-            except Exception as e:
-                st.error(f"Failed to parse JSON from Streamlit Secrets: {e}")
-                st.stop()
-        
-        # Second, try standard OS environment variables (for local Docker/Render)
+        # 1. First, check for local development file
+        if os.path.exists("firebase-key.json"):
+            cred = credentials.Certificate("firebase-key.json")
+            
+        # 2. Second, use your exact nested TOML structure for Streamlit Cloud
+        elif "firebase" in st.secrets:
+            key_dict = (
+                json.loads(st.secrets["firebase"]["key_data"])
+                if "key_data" in st.secrets["firebase"]
+                else dict(st.secrets["firebase"])
+            )
+            cred = credentials.Certificate(key_dict)
+            
+        # 3. Third, fallback for Docker/Render (Environment Variables)
         elif os.getenv("FIREBASE_KEY_JSON"):
             cred_dict = json.loads(os.getenv("FIREBASE_KEY_JSON"))
             cred = credentials.Certificate(cred_dict)
             
-        # Finally, fallback to local file (for local development)
+        # 4. Fail gracefully if nothing is found
         else:
-            try:
-                cred = credentials.Certificate("firebase-key.json")
-            except Exception as e:
-                st.error("CRITICAL ERROR: No Firebase credentials found in st.secrets, os.env, or local file.")
-                st.stop()
-                
+            st.error(
+                "Authentication Failure: No Firebase credentials found in secrets, env, or local file.",
+                icon=":material/lock:",
+            )
+            st.stop()
+            
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
