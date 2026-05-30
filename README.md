@@ -40,7 +40,7 @@ graph TD
     subgraph "4. Application & Intelligence"
         Streamlit[Streamlit Cloud Dashboard] -->|Queries History| FB
         Streamlit -->|Loads Scikit-Learn| Repo
-        Streamlit -->|Context Prompt| Gemini[Google Gemini 1.5 API]
+        Streamlit -->|Context Prompt| Gemini[Google Gemini 3.5 API]
         Gemini -->|Radio Broadcast| Streamlit
     end
 
@@ -93,7 +93,7 @@ Building this enterprise-grade pipeline required overcoming real-world engineeri
 ## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif" width="28" align="center"> Roadmap
 
 - [x] **Phase 1:** Migrate from flat CSVs to Cloud NoSQL (Firebase).
-- [x] **Phase 2:** Implement **Gemini 1.5** for automated commute broadcasting.
+- [x] **Phase 2:** Implement **Gemini 3.5** for automated commute broadcasting.
 - [x] **Phase 3:** Create a 15-minute automated concurrent scraper pipeline.
 - [x] **Phase 4:** Develop an automated MLOps retraining loop and Advanced Analytics Dashboard.
 - [ ] **Phase 5:** Develop a predictive traffic alerting system via WhatsApp API.
