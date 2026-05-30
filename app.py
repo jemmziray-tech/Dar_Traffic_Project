@@ -1,362 +1,219 @@
 import os
 import json
-import time
-from datetime import datetime
-import pytz
 import pandas as pd
-import pydeck as pdk
+import folium
+from folium.plugins import MarkerCluster
+from streamlit_folium import st_folium
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-import google.generativeai as genai
-from dotenv import load_dotenv
+from datetime import datetime
+import pytz
 
-# Load Environment Variables securely
-load_dotenv()
-
-# --- 1. Setup Page Config ---
+# --- 1. SETUP PAGE CONFIG & ENTERPRISE CSS ---
 st.set_page_config(
-    page_title="Dar Traffic Command",
+    page_title="DarTraffic Engine",
+    page_icon=":material/public:",
     layout="wide",
-    page_icon=":material/satellite_alt:",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed", # Collapse sidebar for a cleaner full-screen feel
 )
 
-# --- CUSTOM CSS ---
-st.markdown(
-    """
+st.markdown("""
 <style>
-.blob { border-radius: 50%; margin-right: 8px; height: 10px; width: 10px; display: inline-block; transform: scale(1); }
-.blob.green { background: rgba(40, 167, 69, 1); box-shadow: 0 0 8px rgba(40, 167, 69, 0.8); animation: pulse 2s infinite;}
-.blob.yellow { background: rgba(255, 193, 7, 1); box-shadow: 0 0 8px rgba(255, 193, 7, 0.8); }
-.blob.red { background: rgba(220, 53, 69, 1); box-shadow: 0 0 8px rgba(220, 53, 69, 0.8); }
-@keyframes pulse { 
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); } 
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); } 
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); } 
-}
-div[data-testid="stMetricValue"] { font-weight: 600; letter-spacing: -0.5px; }
-.block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+    /* Enterprise Typography & Layout */
+    .block-container { padding-top: 2rem; padding-bottom: 2rem; max-width: 98%; font-family: 'Inter', sans-serif;}
+    
+    /* Hero Section */
+    .hero-title { font-size: 2.5rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0px; letter-spacing: -0.5px;}
+    .hero-subtitle { font-size: 1.1rem; color: #A0A0A0; margin-top: 5px; margin-bottom: 30px; font-weight: 400;}
+    
+    /* Dynamic Hover-Reactive KPI Cards */
+    .kpi-card {
+        background: linear-gradient(145deg, #1a1a1a 0%, #252525 100%);
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        margin-bottom: 20px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border: 1px solid #333;
+    }
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+    }
+    .kpi-title { color: #9E9E9E; font-size: 0.85rem; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;}
+    .kpi-value { color: #FFFFFF; font-size: 2.4rem; font-weight: 800; margin: 0; line-height: 1.2;}
+    .kpi-subtext { color: #757575; font-size: 0.85rem; margin-top: 5px;}
+    
+    /* Map Container styling */
+    .map-container { border-radius: 12px; overflow: hidden; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.4); margin-top: 10px;}
+    
+    /* Status Pill Badges */
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase;}
+    .badge-clear { background: rgba(0, 204, 150, 0.15); color: #00CC96; border: 1px solid #00CC96;}
+    .badge-warn { background: rgba(246, 200, 95, 0.15); color: #F6C85F; border: 1px solid #F6C85F;}
+    .badge-danger { background: rgba(255, 75, 75, 0.15); color: #FF4B4B; border: 1px solid #FF4B4B;}
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 
-# --- 2. Connect to Firebase ---
+# --- 2. SECURE FIREBASE CONNECTION ---
 @st.cache_resource
-def init_system():
+def get_db():
     if not firebase_admin._apps:
-        if os.path.exists("firebase-key.json"):
-            cred = credentials.Certificate("firebase-key.json")
-        elif "firebase" in st.secrets:
-            key_dict = (
-                json.loads(st.secrets["firebase"]["key_data"])
-                if "key_data" in st.secrets["firebase"]
-                else dict(st.secrets["firebase"])
-            )
-            cred = credentials.Certificate(key_dict)
+        firebase_secret = os.getenv("FIREBASE_KEY_JSON")
+        if firebase_secret:
+            cred_dict = json.loads(firebase_secret)
+            cred = credentials.Certificate(cred_dict)
         else:
-            st.error(
-                "Authentication Failure: No Firebase credentials.",
-                icon=":material/lock:",
-            )
-            st.stop()
+            cred = credentials.Certificate("firebase-key.json")
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
+db = get_db()
 
-db = init_system()
+# --- 3. FETCH LIVE TELEMETRY ---
+@st.cache_data(ttl=60) # Cache for 1 minute for live feel
+def load_live_data():
+    try:
+        docs = db.collection("live_traffic").stream()
+        df = pd.DataFrame([doc.to_dict() for doc in docs])
+        
+        if not df.empty:
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+            df = df.sort_values(by="timestamp", ascending=False)
+            df = df.drop_duplicates(subset="road_id", keep="first")
+            
+        return df
+    except Exception as e:
+        st.error(f"Database Connection Error: {e}")
+        return pd.DataFrame()
 
-# --- 3. MASTER CITY GRID COORDINATES ---
-ROAD_COORDS = {
-    "ubungo": {"lat": -6.8009, "lon": 39.2250},
-    "mwenge": {"lat": -6.7687, "lon": 39.2460},
-    "selander": {"lat": -6.8000, "lon": 39.2800},
-    "tazara": {"lat": -6.8344, "lon": 39.2540},
-    "mandela_buguruni": {"lat": -6.8310, "lon": 39.2527},
-    "kilwa_mbagala": {"lat": -6.8900, "lon": 39.2750},
-    "old_bagamoyo": {"lat": -6.7770, "lon": 39.2600},
-    "sam_nujoma": {"lat": -6.7865, "lon": 39.2320},
-    "uhuru_street": {"lat": -6.8187, "lon": 39.2685},
-    "posta_to_tegeta": {"lat": -6.7295, "lon": 39.2215},
-    "posta_to_kimara": {"lat": -6.7980, "lon": 39.2190},
-    "posta_to_gongolamboto": {"lat": -6.8505, "lon": 39.2275},
-    "tabata_dampo": {"lat": -6.8225, "lon": 39.2185},
-    "kamata_gerezani": {"lat": -6.8230, "lon": 39.2815},
-    "changombe_road": {"lat": -6.8450, "lon": 39.2675},
-    "morocco_intersection": {"lat": -6.7885, "lon": 39.2605},
-    "kigogo_roundabout": {"lat": -6.8170, "lon": 39.2525},
-    "fire_upanga": {"lat": -6.8070, "lon": 39.2750},
-    "mwai_kibaki": {"lat": -6.7550, "lon": 39.2425},
-    "sinza_mori": {"lat": -6.7740, "lon": 39.2400},
-    "goba_massana": {"lat": -6.7200, "lon": 39.2000},
+df = load_live_data()
+
+# --- 4. HERO SECTION & HEADER ---
+col_head1, col_head2 = st.columns([3, 1])
+with col_head1:
+    st.markdown('<h1 class="hero-title">:material/satellite_alt: DarTraffic Command Center</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="hero-subtitle">Real-time Digital Twin & AI Logistics Engine</p>', unsafe_allow_html=True)
+with col_head2:
+    # Live Timestamp Indicator
+    if not df.empty:
+        tz = pytz.timezone('Africa/Dar_es_Salaam')
+        last_sync = df['timestamp'].max().astimezone(tz).strftime('%H:%M:%S EAT')
+        st.markdown(f"""
+        <div style="text-align: right; margin-top: 15px;">
+            <span style="color: #00CC96; font-size: 0.8rem;">● LIVE TELEMETRY FEED</span><br>
+            <span style="color: #A0A0A0; font-size: 0.85rem;">Last Sync: {last_sync}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+if df.empty:
+    st.warning(":material/sync_problem: No live telemetry found. Awaiting Cloud Scheduler sync.")
+    st.stop()
+
+# --- 5. NETWORK STATUS ALERTS ---
+city_is_raining = df["weather"].str.contains("Rain", case=False, na=False).any()
+
+if city_is_raining:
+    st.error(":material/thunderstorm: **SYSTEM ADVISORY:** Rain detected in specific Dar es Salaam micro-climates. Routing algorithms automatically adjusted for elevated friction.", icon="⚠️")
+
+# --- 6. EXECUTIVE KPI METRICS ---
+avg_speed = df["speed_kmh"].mean()
+worst_road_row = df.loc[df['delay_mins'].idxmax()]
+worst_road_name = worst_road_row['name'].replace(' Mega-Route: ', '').split(' (')[0]
+worst_road_delay = worst_road_row['delay_mins']
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown(f"""
+    <div class="kpi-card" style="border-top-color: #4B8BBE;">
+        <div class="kpi-title">:material/share_location: Active Arteries Monitored</div>
+        <div class="kpi-value">{len(df)}</div>
+        <div class="kpi-subtext">Sensors online across major corridors</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    color = "#FF4B4B" if avg_speed < 15 else "#F6C85F" if avg_speed < 25 else "#00CC96"
+    st.markdown(f"""
+    <div class="kpi-card" style="border-top-color: {color};">
+        <div class="kpi-title">:material/speed: City-Wide Avg Speed</div>
+        <div class="kpi-value">{avg_speed:.1f} <span style="font-size: 1.2rem; color: #A0A0A0;">km/h</span></div>
+        <div class="kpi-subtext">Aggregate network flow rate</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    color = "#FF4B4B" if worst_road_delay > 15 else "#F6C85F"
+    st.markdown(f"""
+    <div class="kpi-card" style="border-top-color: {color};">
+        <div class="kpi-title">:material/warning: Primary Bottleneck</div>
+        <div class="kpi-value" style="font-size: 1.8rem; margin-top: 10px;">{worst_road_name}</div>
+        <div class="kpi-subtext" style="color: {color}; font-weight: bold;">+{worst_road_delay} mins structural delay</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# --- 7. 4D SPATIAL MAP (FOLIUM) ---
+st.markdown("<h3 style='color: #E0E0E0; font-size: 1.2rem; margin-top: 10px;'>:material/map: Spatial Telemetry Grid</h3>", unsafe_allow_html=True)
+
+road_coords = {
+    "ubungo": [-6.7978, 39.2201], "mwenge": [-6.7744, 39.2431], "selander": [-6.7950, 39.2750],
+    "tazara": [-6.8288, 39.2600], "mandela_buguruni": [-6.8285, 39.2435], "kilwa_mbagala": [-6.9050, 39.2700],
+    "old_bagamoyo": [-6.7720, 39.2550], "sam_nujoma": [-6.7755, 39.2435], "uhuru_street": [-6.8220, 39.2550],
+    "kariakoo": [-6.8115, 39.2725], "posta_to_tegeta": [-6.7295, 39.2215], "posta_to_kimara": [-6.7980, 39.2190],
+    "posta_to_gongolamboto": [-6.8505, 39.2085], "tabata_dampo": [-6.8150, 39.2320], "kamata_gerezani": [-6.8280, 39.2780],
+    "changombe_road": [-6.8350, 39.2700], "morocco_intersection": [-6.7820, 39.2630], "kigogo_roundabout": [-6.8120, 39.2550],
+    "fire_upanga": [-6.8120, 39.2780], "mwai_kibaki": [-6.7450, 39.2350], "sinza_mori": [-6.7780, 39.2350], "goba_massana": [-6.7250, 39.2150]
 }
 
+dar_map = folium.Map(location=[-6.81, 39.25], zoom_start=12, tiles="CartoDB dark_matter", control_scale=True)
+marker_cluster = MarkerCluster().add_to(dar_map)
 
-# --- 4. Helper Functions ---
-@st.cache_data(ttl=60)
-def get_live_data():
-    docs = db.collection("live_traffic").stream()
-    data = []
-    for doc in docs:
-        row = doc.to_dict()
-        row["id"] = doc.id
-        coords = ROAD_COORDS.get(doc.id, {"lat": -6.792, "lon": 39.239})
-        row["lat"], row["lon"] = coords["lat"], coords["lon"]
-        row["color"] = (
-            [220, 53, 69, 255]
-            if row["delay_mins"] > 10
-            else ([255, 193, 7, 220] if row["delay_mins"] > 4 else [40, 167, 69, 200])
-        )
-        row["elevation_val"] = max(row["delay_mins"] * 3, 0.5)
-        data.append(row)
-    return pd.DataFrame(data)
+for idx, row in df.iterrows():
+    if row["road_id"] in road_coords:
+        lat, lon = road_coords[row["road_id"]]
+        
+        if row["status"] == "Heavy Jam" or row["delay_mins"] > 15:
+            color, icon, badge_class = "red", "info-sign", "badge-danger"
+            status_text = "CRITICAL GRIDLOCK"
+        elif row["status"] == "Moderate" or row["delay_mins"] > 5:
+            color, icon, badge_class = "orange", "info-sign", "badge-warn"
+            status_text = "MODERATE FRICTION"
+        else:
+            color, icon, badge_class = "green", "info-sign", "badge-clear"
+            status_text = "OPTIMAL FLOW"
 
+        # Custom Dark-Mode HTML for the Popup Tooltip
+        popup_html = f"""
+        <div style="font-family: 'Segoe UI', sans-serif; background-color: #212121; color: #fff; padding: 15px; border-radius: 8px; min-width: 220px; border: 1px solid #444;">
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #E0E0E0; border-bottom: 1px solid #444; padding-bottom: 8px;">{row['name']}</h4>
+            <div style="margin-bottom: 12px;"><span class="badge {badge_class}">{status_text}</span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                <span style="color: #9e9e9e; font-size: 12px;">Delay:</span>
+                <span style="font-weight: bold; color: {('#FF4B4B' if color=='red' else '#F6C85F' if color=='orange' else '#00CC96')};">+{row['delay_mins']} mins</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                <span style="color: #9e9e9e; font-size: 12px;">Speed:</span>
+                <span style="font-weight: bold;">{row['speed_kmh']} km/h</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #9e9e9e; font-size: 12px;">Weather:</span>
+                <span style="font-weight: bold;">{row['weather']}</span>
+            </div>
+        </div>
+        """
 
-df_raw = get_live_data()
-tz = pytz.timezone("Africa/Dar_es_Salaam")
+        folium.Marker(
+            location=[lat, lon],
+            popup=folium.Popup(popup_html, max_width=300),
+            tooltip=f"{row['name']} (+{row['delay_mins']}m)",
+            icon=folium.Icon(color=color, icon=icon)
+        ).add_to(marker_cluster)
 
-# --- 5. SIDEBAR: COMMAND CENTER ---
-with st.sidebar:
-    st.title(":material/memory: System Core")
-    st.markdown(
-        '<div class="blob green"></div> **Live Network Active**', unsafe_allow_html=True
-    )
-    st.caption(f"Local Time: {datetime.now(tz).strftime('%H:%M %Z')}")
-    st.divider()
-
-    if st.button(
-        "Force Satellite Sync", icon=":material/sync:", use_container_width=True
-    ):
-        get_live_data.clear()
-        st.rerun()
-
-    st.subheader("Data Export")
-    if not df_raw.empty:
-        st.download_button(
-            "Download Live CSV",
-            data=df_raw.to_csv(index=False).encode("utf-8"),
-            file_name="dar_traffic_live.csv",
-            icon=":material/download:",
-            use_container_width=True,
-        )
-
-    # Historical Archive Compiler
-    with st.expander(":material/folder_zip: Full History Archive", expanded=False):
-        st.caption("Export all historical telemetry since Day 1.")
-
-        if "full_csv" not in st.session_state:
-            if st.button(
-                "Compile Database Archive",
-                icon=":material/archive:",
-                use_container_width=True,
-            ):
-                with st.spinner("Querying Firebase (This may take a moment)..."):
-                    docs = (
-                        db.collection("traffic_history")
-                        .order_by("timestamp", direction=firestore.Query.DESCENDING)
-                        .stream()
-                    )
-                    history_df = pd.DataFrame([doc.to_dict() for doc in docs])
-
-                    if not history_df.empty:
-                        st.session_state.full_csv = history_df.to_csv(
-                            index=False
-                        ).encode("utf-8")
-                        st.session_state.archive_date = datetime.now(tz).strftime(
-                            "%Y%m%d"
-                        )
-                        st.rerun()
-                    else:
-                        st.error("Database is empty.", icon=":material/error:")
-
-        if "full_csv" in st.session_state:
-            st.success("Archive Ready!", icon=":material/check_circle:")
-            st.download_button(
-                label="Download Archive.csv",
-                data=st.session_state.full_csv,
-                file_name=f"dar_traffic_full_archive_{st.session_state.archive_date}.csv",
-                mime="text/csv",
-                icon=":material/download:",
-                use_container_width=True,
-            )
-
-    st.divider()
-    st.caption("Architected by John Mziray")
-
-# --- 6. TOP KPIs ---
-st.title("Dar es Salaam Smart City Engine")
-st.markdown("---")
-
-if not df_raw.empty:
-    avg_speed = df_raw["speed_kmh"].mean()
-    total_delay = df_raw["delay_mins"].sum()
-    efficiency = 100 - min((total_delay / 250) * 100, 100)
-    total_wasted_tzs = total_delay * 101 * 750
-
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Network Efficiency", f"{efficiency:.1f}%")
-    k2.metric("Average Velocity", f"{avg_speed:.1f} km/h")
-    k3.metric("Cumulative Gridlock", f"{total_delay} Mins")
-    k4.metric(
-        "Capital Friction (Live)",
-        (
-            f"{total_wasted_tzs / 1000000:.1f}M TZS"
-            if total_wasted_tzs >= 1000000
-            else f"{total_wasted_tzs:,.0f} TZS"
-        ),
-        delta="Wasted Productivity",
-        delta_color="inverse",
-    )
-
-    st.write("")
-
-    # --- 7. THE HIDDEN 4D MAP ---
-    with st.expander(
-        ":material/public: Open Live Spatial Grid (4D Digital Twin)", expanded=False
-    ):
-        st.caption(
-            "Live geospatial density visualization of current traffic conditions."
-        )
-        tooltip = {
-            "html": "<b style='font-family: sans-serif; font-size: 14px;'>{name}</b><br/>Live Delay: <b>{delay_mins} mins</b>",
-            "style": {
-                "backgroundColor": "#121212",
-                "color": "white",
-                "borderRadius": "4px",
-                "padding": "8px",
-            },
-        }
-        view_state = pdk.ViewState(
-            latitude=-6.80, longitude=39.24, zoom=10.8, pitch=55, bearing=0
-        )
-        layer = pdk.Layer(
-            "ColumnLayer",
-            df_raw,
-            get_position=["lon", "lat"],
-            get_elevation="elevation_val",
-            elevation_scale=150,
-            radius=300,
-            get_fill_color="color",
-            extruded=True,
-            pickable=True,
-            auto_highlight=True,
-        )
-        st.pydeck_chart(
-            pdk.Deck(
-                layers=[layer],
-                initial_view_state=view_state,
-                tooltip=tooltip,
-                map_style="dark",
-            )
-        )
-
-    st.write("")
-
-    # --- 8. MAIN DASHBOARD SPLIT ---
-    col_alerts, col_feed = st.columns([1, 2], gap="large")
-
-    with col_alerts:
-        with st.container(border=True):
-            st.subheader(":material/gpp_maybe: Network Status")
-            bottleneck_row = df_raw.loc[df_raw["delay_mins"].idxmax()]
-            if total_delay > 150:
-                st.error(
-                    f"**Critical:** Severe volume at {bottleneck_row['name']}.",
-                    icon=":material/gpp_bad:",
-                )
-            elif "Rain" in str(df_raw["weather"].iloc[0]) or "Drizzle" in str(
-                df_raw["weather"].iloc[0]
-            ):
-                st.warning(
-                    "**Weather:** Precipitation impacting flow.",
-                    icon=":material/water_drop:",
-                )
-            else:
-                st.success(
-                    "**Optimal:** Arteries flowing nominally.",
-                    icon=":material/gpp_good:",
-                )
-
-            st.write(f"**Structural Efficiency:** {efficiency:.1f}%")
-            st.progress(efficiency / 100)
-
-        st.write("")
-
-        with st.container(border=True):
-            st.subheader(":material/robot_2: AI Executive Briefing")
-            st.caption("Generates a live macro-summary for logistics planning.")
-            gemini_key = os.getenv("GEMINI_API_KEY") or (
-                st.secrets.get("GEMINI_API_KEY")
-                if "GEMINI_API_KEY" in st.secrets
-                else None
-            )
-
-            if gemini_key:
-                genai.configure(api_key=gemini_key)
-                if st.button(
-                    "Generate Dispatch Report",
-                    type="primary",
-                    use_container_width=True,
-                    icon=":material/graphic_eq:",
-                ):
-                    with st.spinner("Analyzing macro-level routing data..."):
-                        try:
-                            prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
-                            #  UPDATED TO 3.5 FLASH HERE
-                            response = genai.GenerativeModel(
-                                "gemini-3.5-flash"
-                            ).generate_content(prompt)
-                            st.info(response.text)
-                        except Exception as e:
-                            st.error(f"Generative AI API Error: {e}")
-            else:
-                st.info(
-                    "Provide GEMINI_API_KEY in environment to enable AI Briefings.",
-                    icon=":material/key:",
-                )
-
-    with col_feed:
-        st.subheader(":material/table: Live Node Telemetry Feed")
-        df_sorted = df_raw.sort_values(by="delay_mins", ascending=False).reset_index(
-            drop=True
-        )
-
-        num_cols = 3
-        for i in range(0, min(9, len(df_sorted)), num_cols):
-            chunk = df_sorted.iloc[i : i + num_cols]
-            cols = st.columns(num_cols)
-            for index, row in chunk.reset_index().iterrows():
-                with cols[index]:
-                    css_class = (
-                        "green"
-                        if row["delay_mins"] <= 4
-                        else ("yellow" if row["delay_mins"] <= 10 else "red")
-                    )
-                    with st.container(border=True):
-                        st.markdown(
-                            f"""
-                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                                <div class="blob {css_class}"></div>
-                                <span style="font-weight: 600; font-size: 0.85em; color: #E0E0E0;">{row['name'].upper()}</span>
-                            </div>
-                        """,
-                            unsafe_allow_html=True,
-                        )
-                        st.metric(
-                            label="Calculated Velocity",
-                            value=f"{row['speed_kmh']} km/h",
-                            delta=f"{row['delay_mins']} min delay",
-                            delta_color="inverse",
-                        )
-                        st.progress(min(row["speed_kmh"] / 50.0, 1.0))
-                        st.caption(f":material/filter_drama: {row['weather'].upper()}")
-
-        if len(df_sorted) > 9:
-            st.caption(
-                f"... and {len(df_sorted) - 9} other nodes operating within nominal thresholds."
-            )
-
-else:
-    st.info("Awaiting telemetry uplink...", icon=":material/cell_tower:")
+# Render the Map inside a styled container
+st.markdown('<div class="map-container">', unsafe_allow_html=True)
+st_folium(dar_map, width="100%", height=550, returned_objects=[])
+st.markdown('</div>', unsafe_allow_html=True)
