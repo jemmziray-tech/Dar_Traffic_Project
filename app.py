@@ -61,12 +61,31 @@ st.markdown("""
 @st.cache_resource
 def get_db():
     if not firebase_admin._apps:
-        firebase_secret = os.getenv("FIREBASE_KEY_JSON")
-        if firebase_secret:
-            cred_dict = json.loads(firebase_secret)
+        # First, try to get it from Streamlit's native secrets manager
+        if "FIREBASE_KEY_JSON" in st.secrets:
+            # Streamlit secrets handles the JSON string directly
+            firebase_secret = st.secrets["FIREBASE_KEY_JSON"]
+            try:
+                # If you pasted raw JSON into the secret box, parse it
+                cred_dict = json.loads(firebase_secret)
+                cred = credentials.Certificate(cred_dict)
+            except Exception as e:
+                st.error(f"Failed to parse JSON from Streamlit Secrets: {e}")
+                st.stop()
+        
+        # Second, try standard OS environment variables (for local Docker/Render)
+        elif os.getenv("FIREBASE_KEY_JSON"):
+            cred_dict = json.loads(os.getenv("FIREBASE_KEY_JSON"))
             cred = credentials.Certificate(cred_dict)
+            
+        # Finally, fallback to local file (for local development)
         else:
-            cred = credentials.Certificate("firebase-key.json")
+            try:
+                cred = credentials.Certificate("firebase-key.json")
+            except Exception as e:
+                st.error("CRITICAL ERROR: No Firebase credentials found in st.secrets, os.env, or local file.")
+                st.stop()
+                
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
