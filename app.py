@@ -92,51 +92,54 @@ m4.metric(label="Primary Bottleneck", value=worst_road['name'].replace('Mega-Rou
 
 st.write("") # Spacer
 
-# --- 6. GEOSPATIAL MAP (HERO ELEMENT) ---
-road_segments = {
-    "ubungo": [[-6.7978,39.2201], [-6.8040,39.2300]],
-    "mwenge": [[-6.7744,39.2431], [-6.7631,39.2489]],
-    "selander": [[-6.7950,39.2750], [-6.8050,39.2850]],
-    "tazara": [[-6.8288,39.2600], [-6.8400,39.2480]],
-    "mandela_buguruni": [[-6.8285,39.2435], [-6.8335,39.2620]],
-    "kilwa_mbagala": [[-6.9050,39.2700], [-6.8750,39.2800]],
-    "old_bagamoyo": [[-6.7720,39.2550], [-6.7820,39.2650]],
-    "sam_nujoma": [[-6.7755,39.2435], [-6.7975,39.2205]],
-    "uhuru_street": [[-6.8220,39.2550], [-6.8155,39.2820]],
-    "kariakoo": [[-6.8115,39.2725], [-6.8210,39.2750]],
-    "posta_to_tegeta": [[-6.8160,39.2880], [-6.6430,39.1550]],
-    "posta_to_kimara": [[-6.8160,39.2880], [-6.7800,39.1500]],
-    "posta_to_gongolamboto": [[-6.8160,39.2880], [-6.8850,39.1670]],
-    "tabata_dampo": [[-6.8150,39.2320], [-6.8300,39.2050]],
-    "kamata_gerezani": [[-6.8280,39.2780], [-6.8180,39.2850]],
-    "changombe_road": [[-6.8350,39.2700], [-6.8550,39.2650]],
-    "morocco_intersection": [[-6.7820,39.2630], [-6.7950,39.2580]],
-    "kigogo_roundabout": [[-6.8120,39.2550], [-6.8220,39.2500]],
-    "fire_upanga": [[-6.8120,39.2780], [-6.8020,39.2720]],
-    "mwai_kibaki": [[-6.7450,39.2350], [-6.7650,39.2500]],
-    "sinza_mori": [[-6.7780,39.2350], [-6.7700,39.2450]],
-    "goba_massana": [[-6.7250,39.2150], [-6.7150,39.1850]]
-}
+# --- 6. GEOSPATIAL MAP (OPTIONAL EXPANDER) ---
+with st.expander("🗺️ **Expand Spatial Telemetry Grid (Map View)**", expanded=False):
+    st.caption("Live geospatial density visualization. Red indicates severe structural delay; green indicates optimal flow.")
+    
+    road_segments = {
+        "ubungo": [[-6.7978,39.2201], [-6.8040,39.2300]],
+        "mwenge": [[-6.7744,39.2431], [-6.7631,39.2489]],
+        "selander": [[-6.7950,39.2750], [-6.8050,39.2850]],
+        "tazara": [[-6.8288,39.2600], [-6.8400,39.2480]],
+        "mandela_buguruni": [[-6.8285,39.2435], [-6.8335,39.2620]],
+        "kilwa_mbagala": [[-6.9050,39.2700], [-6.8750,39.2800]],
+        "old_bagamoyo": [[-6.7720,39.2550], [-6.7820,39.2650]],
+        "sam_nujoma": [[-6.7755,39.2435], [-6.7975,39.2205]],
+        "uhuru_street": [[-6.8220,39.2550], [-6.8155,39.2820]],
+        "kariakoo": [[-6.8115,39.2725], [-6.8210,39.2750]],
+        "posta_to_tegeta": [[-6.8160,39.2880], [-6.6430,39.1550]],
+        "posta_to_kimara": [[-6.8160,39.2880], [-6.7800,39.1500]],
+        "posta_to_gongolamboto": [[-6.8160,39.2880], [-6.8850,39.1670]],
+        "tabata_dampo": [[-6.8150,39.2320], [-6.8300,39.2050]],
+        "kamata_gerezani": [[-6.8280,39.2780], [-6.8180,39.2850]],
+        "changombe_road": [[-6.8350,39.2700], [-6.8550,39.2650]],
+        "morocco_intersection": [[-6.7820,39.2630], [-6.7950,39.2580]],
+        "kigogo_roundabout": [[-6.8120,39.2550], [-6.8220,39.2500]],
+        "fire_upanga": [[-6.8120,39.2780], [-6.8020,39.2720]],
+        "mwai_kibaki": [[-6.7450,39.2350], [-6.7650,39.2500]],
+        "sinza_mori": [[-6.7780,39.2350], [-6.7700,39.2450]],
+        "goba_massana": [[-6.7250,39.2150], [-6.7150,39.1850]]
+    }
 
-dar_map = folium.Map(location=[-6.815, 39.255], zoom_start=12, tiles="CartoDB dark_matter", control_scale=True)
+    dar_map = folium.Map(location=[-6.815, 39.255], zoom_start=12, tiles="CartoDB dark_matter", control_scale=True)
 
-for idx, row in df.iterrows():
-    if row["road_id"] in road_segments:
-        coords = road_segments[row["road_id"]]
-        
-        # Elegant data-driven styling
-        if row["delay_mins"] > 15:
-            color, weight, opacity = "#FF4B4B", 6, 0.9 # Thick Red
-        elif row["delay_mins"] > 5:
-            color, weight, opacity = "#F6C85F", 4, 0.7 # Medium Yellow
-        else:
-            color, weight, opacity = "#00CC96", 2, 0.4 # Thin Green
+    for idx, row in df.iterrows():
+        if row["road_id"] in road_segments:
+            coords = road_segments[row["road_id"]]
             
-        tooltip = f"<span style='font-family: sans-serif;'><b>{row['name']}</b><br>Delay: +{row['delay_mins']}m | Speed: {row['speed_kmh']}km/h</span>"
-        folium.PolyLine(locations=coords, color=color, weight=weight, opacity=opacity, tooltip=tooltip).add_to(dar_map)
+            # Elegant data-driven styling
+            if row["delay_mins"] > 15:
+                color, weight, opacity = "#FF4B4B", 6, 0.9 # Thick Red
+            elif row["delay_mins"] > 5:
+                color, weight, opacity = "#F6C85F", 4, 0.7 # Medium Yellow
+            else:
+                color, weight, opacity = "#00CC96", 2, 0.4 # Thin Green
+                
+            tooltip = f"<span style='font-family: sans-serif;'><b>{row['name']}</b><br>Delay: +{row['delay_mins']}m | Speed: {row['speed_kmh']}km/h</span>"
+            folium.PolyLine(locations=coords, color=color, weight=weight, opacity=opacity, tooltip=tooltip).add_to(dar_map)
 
-# Render map spanning full width
-st_folium(dar_map, use_container_width=True, height=500, returned_objects=[])
+    # Render map spanning full width of the expander
+    st_folium(dar_map, use_container_width=True, height=450, returned_objects=[])
 
 st.write("")
 
