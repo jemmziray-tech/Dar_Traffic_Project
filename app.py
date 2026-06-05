@@ -8,14 +8,13 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
 import pytz
-import random
 
 # --- 1. SETUP PAGE CONFIG & ENTERPRISE CSS ---
 st.set_page_config(
     page_title="DarTraffic Command Center",
     page_icon=":material/public:",
     layout="wide",
-    initial_sidebar_state="expanded", # Expanded to show your Architect signature
+    initial_sidebar_state="expanded", 
 )
 
 st.markdown("""
@@ -69,14 +68,11 @@ st.markdown("""
 with st.sidebar:
     st.markdown("""
     <div class="architect-badge">
-        <div style="color: #A0A0A0; font-size: 0.8rem; margin-bottom: 5px;">ARCHITECTED BY</div>
+        <div style="color: #A0A0A0; font-size: 0.8rem; margin-bottom: 5px;">SYSTEM ARCHITECT</div>
         <div class="architect-name">John Mziray</div>
         <div class="architect-title">BSc in AI & Machine Learning</div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Hidden toggle just for you to turn off the fake data when you want real data
-    demo_mode = st.toggle("Portfolio Demo Mode (Force Delays)", True)
 
 # --- 3. SECURE FIREBASE CONNECTION ---
 @st.cache_resource
@@ -97,32 +93,22 @@ def get_db():
 
 db = get_db()
 
-# --- 4. FETCH LIVE TELEMETRY ---
-@st.cache_data(ttl=60) # Cache for 1 minute
-def load_live_data(force_demo: bool):
+# --- 4. FETCH LIVE TELEMETRY (PURE PRODUCTION DATA) ---
+@st.cache_data(ttl=60) 
+def load_live_data():
     try:
         docs = db.collection("live_traffic").stream()
         df = pd.DataFrame([doc.to_dict() for doc in docs])
         if not df.empty:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
+            # Keep only the absolute freshest ping for each road
             df = df.sort_values(by="timestamp", ascending=False).drop_duplicates(subset="road_id", keep="first")
-            
-            # --- PORTFOLIO DEMO OVERRIDE ---
-            # Randomly selects 12 roads and forces them to have massive delays for visualization
-            if force_demo and len(df) >= 12:
-                random.seed(42) # Fixed seed so it doesn't flicker on refresh
-                demo_indices = random.sample(range(len(df)), 12)
-                for i in demo_indices:
-                    fake_delay = random.randint(18, 45)
-                    df.iloc[i, df.columns.get_loc("delay_mins")] = fake_delay
-                    df.iloc[i, df.columns.get_loc("status")] = "Heavy Jam"
-            
         return df
     except Exception as e:
         st.error(f"Database Connection Error: {e}")
         return pd.DataFrame()
 
-df = load_live_data(demo_mode)
+df = load_live_data()
 
 # --- 5. HERO SECTION ---
 col_head1, col_head2 = st.columns([3, 1])
