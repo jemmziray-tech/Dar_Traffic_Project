@@ -1,130 +1,84 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security, Depends
+from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 import pandas as pd
 import joblib
 import os
 from datetime import datetime
 
+# --- 1. SECURITY SETUP ---
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
 
-# --- 1. Define the Expected Input (Data Validation) ---
-# This is what the WhatsApp Bot or Dashboard will send to the API
+# This reads your key from the Environment Variable (set this in Render Dashboard!)
+API_KEY = os.getenv("DAR_TRAFFIC_API_KEY", "dev-secret-key-123")
+
+def verify_api_key(api_key: str = Security(api_key_header)):
+    if api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
+    return api_key
+
+# --- 2. INPUT VALIDATION ---
 class TrafficQuery(BaseModel):
     road_id: str
-    timestamp: str  # e.g., "2026-05-29 17:30:00"
-    temperature_c: float  # e.g., 25.2
-    is_raining: int  # 1 if raining, 0 if clear
-    delay_velocity: float  # The change in delay over the last 20 mins (e.g., 5.0 means getting worse)
+    timestamp: str  # Format: "2026-05-29 17:30:00"
+    temperature_c: float
+    is_raining: int
+    delay_velocity: float
 
-
-# --- 2. Initialize the App ---
-app = FastAPI(
-    title="Dar Traffic Enterprise AI API",
-    description="XGBoost-powered REST API for predicting traffic delays with Explainable AI.",
-    version="3.0.0",
-)
-
-# --- 3. Load the AI Model ---
+# --- 3. LOAD MODEL ---
+app = FastAPI(title="Dar Traffic Enterprise API", version="3.1.0")
 MODEL_PATH = "traffic_model.pkl"
+
+# Load model safely
 if os.path.exists(MODEL_PATH):
-    print("🧠 Loading XGBoost V3 Engine...")
     ai_model = joblib.load(MODEL_PATH)
 else:
-    print("⚠️ WARNING: traffic_model.pkl not found! Did you run train_model.py?")
     ai_model = None
 
+# --- 4. ENDPOINTS ---
+@app.get("/")
+def read_root():
+    return {"status": "online", "message": "Dar Traffic Enterprise API is running."}
 
-# --- 4. Create the Prediction Endpoint ---
-@app.post("/predict")
+@app.post("/predict", dependencies=[Depends(verify_api_key)])
 def predict_traffic(query: TrafficQuery):
-    # Safety check: ensure the model actually loaded
     if ai_model is None:
-        raise HTTPException(
-            status_code=500, detail="AI Model is offline. Please train the model first."
-        )
+        raise HTTPException(status_code=500, detail="AI Model not found on server.")
 
     try:
-        # ---------------------------------------------------------
-        # A. FEATURE ENGINEERING (Translating user input for the AI)
-        # ---------------------------------------------------------
-        try:
-            dt = pd.to_datetime(query.timestamp)
-        except Exception:
-            raise HTTPException(
-                status_code=400, detail="Invalid timestamp. Use YYYY-MM-DD HH:MM:SS"
-            )
+        # Feature Engineering
+        dt = pd.to_datetime(query.timestamp)
+        input_data = pd.DataFrame([{
+            "road_id": query.road_id,
+            "hour": dt.hour,
+            "day_of_week": dt.dayofweek,
+            "is_weekend": 1 if dt.dayofweek >= 5 else 0,
+            "is_rush_hour": 1 if dt.hour in [7, 8, 16, 17, 18, 19] else 0,
+            "temp_c": query.temperature_c,
+            "is_raining": query.is_raining,
+            "delay_velocity": query.delay_velocity,
+        }])
 
-        hour = dt.hour
-        day_of_week = dt.dayofweek
-
-        # Calculate the mathematical flags
-        is_weekend = 1 if day_of_week >= 5 else 0
-        is_rush_hour = 1 if hour in [7, 8, 16, 17, 18, 19] else 0
-
-        # Construct the exact DataFrame the XGBoost pipeline expects
-        input_data = pd.DataFrame(
-            [
-                {
-                    "road_id": query.road_id,
-                    "hour": hour,
-                    "day_of_week": day_of_week,
-                    "is_weekend": is_weekend,
-                    "is_rush_hour": is_rush_hour,
-                    "temp_c": query.temperature_c,
-                    "is_raining": query.is_raining,
-                    "delay_velocity": query.delay_velocity,
-                }
-            ]
-        )
-
-        # ---------------------------------------------------------
-        # B. THE AI PREDICTION
-        # ---------------------------------------------------------
+        # Prediction
         prediction = float(ai_model.predict(input_data)[0])
-
-        # Ensure the AI doesn't predict "negative" time due to statistical smoothing
         predicted_delay = max(0.0, round(prediction, 1))
 
-        # ---------------------------------------------------------
-        # C. EXPLAINABLE AI (XAI) - Building Human Trust
-        # ---------------------------------------------------------
-        reasoning = []
-        if is_rush_hour:
-            reasoning.append("peak rush hour volume")
-        if query.is_raining:
-            reasoning.append("adverse weather conditions (Rain)")
-        if query.delay_velocity > 5:
-            reasoning.append(
-                "a rapidly compounding bottleneck (Traffic Velocity is high)"
-            )
-
+        # Explainable AI (XAI)
         explanation = "Traffic is expected to flow normally."
         if predicted_delay > 15:
-            factors = (
-                " compounded by ".join(reasoning)
-                if reasoning
-                else "heavy localized congestion"
-            )
-            explanation = f"🔴 Severe gridlock predicted due to {factors}."
+            explanation = "🔴 Severe gridlock predicted."
         elif predicted_delay > 5:
-            explanation = "🟡 Moderate delays expected. Proceed with caution."
+            explanation = "🟡 Moderate delays expected."
 
-        # ---------------------------------------------------------
-        # D. RETURN THE ENTERPRISE JSON PAYLOAD
-        # ---------------------------------------------------------
         return {
             "status": "success",
-            "telemetry_analyzed": {
-                "road": query.road_id,
-                "timestamp_processed": dt.strftime("%Y-%m-%d %H:%M:%S"),
-            },
             "prediction": {
+                "road": query.road_id,
                 "predicted_delay_mins": predicted_delay,
-                # Applying a standard +/- 3 minute confidence band based on our MAE score!
-                "confidence_interval": f"{max(0, round(predicted_delay - 3.0, 1))} to {round(predicted_delay + 3.0, 1)} mins",
-            },
-            "xai_explanation": explanation,
+                "explanation": explanation
+            }
         }
 
     except Exception as e:
-        # If anything goes wrong, return a safe error message
         raise HTTPException(status_code=400, detail=f"Prediction failed: {str(e)}")
