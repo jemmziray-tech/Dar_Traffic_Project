@@ -26,3 +26,7 @@ pydeck>=0.9.0
 python-dotenv>=1.0.0
 pytz>=2024.1
 pydantic>=2.0.0
+
+# API hosting(render)
+fastapi
+uvicorn
