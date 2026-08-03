@@ -1,0 +1,6 @@
+.env
+firebase-key.json
+*.pkl
+traffic_model.pkl
+__pycache__/
+.pytest_cache/
