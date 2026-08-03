@@ -120,7 +120,7 @@ ROAD_PATHS = {
 
 
 # --- 4. Helper Functions ---
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=15)
 def get_live_data():
     docs = db.collection("live_traffic").stream()
     data = []
