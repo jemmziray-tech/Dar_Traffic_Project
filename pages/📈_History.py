@@ -57,13 +57,17 @@ def get_roads_list():
 @st.cache_data(ttl=300)
 def get_historical_data(road_id):
     stats_ref = db.collection("traffic_history")
-    query = (
-        stats_ref.where("road_id", "==", road_id)
-        .order_by("timestamp", direction=firestore.Query.DESCENDING)
-        .limit(20000)  # Deep enough for solid trends, light enough for fast UI
-    )
-    results = query.stream()
-    return pd.DataFrame([doc.to_dict() for doc in results])
+    try:
+        # Stream by road_id without composite order_by to avoid missing index errors
+        results = stats_ref.where("road_id", "==", road_id).limit(20000).stream()
+        df_res = pd.DataFrame([doc.to_dict() for doc in results])
+        if not df_res.empty and "timestamp" in df_res.columns:
+            df_res["timestamp_dt"] = pd.to_datetime(df_res["timestamp"], utc=True)
+            df_res = df_res.sort_values("timestamp_dt", ascending=False).drop(columns=["timestamp_dt"])
+        return df_res
+    except Exception as e:
+        st.error(f"Error querying telemetry history: {e}")
+        return pd.DataFrame()
 
 
 def format_road_name(r_id):

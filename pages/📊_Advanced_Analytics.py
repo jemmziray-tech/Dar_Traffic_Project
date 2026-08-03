@@ -432,7 +432,6 @@ with tab4:
                 docs = (
                     db.collection("traffic_history")
                     .where("road_id", "==", test_road_id)
-                    .order_by("timestamp", direction=firestore.Query.DESCENDING)
                     .limit(100)
                     .stream()
                 )
@@ -441,6 +440,9 @@ with tab4:
                     doc.to_dict() for doc in docs if "timestamp" in doc.to_dict()
                 ]
                 df_val = pd.DataFrame(history_data)
+                if not df_val.empty and "timestamp" in df_val.columns:
+                    df_val["timestamp_dt"] = pd.to_datetime(df_val["timestamp"], utc=True)
+                    df_val = df_val.sort_values("timestamp_dt", ascending=False).drop(columns=["timestamp_dt"])
 
                 if not df_val.empty:
                     df_val = df_val.sort_values("timestamp")
