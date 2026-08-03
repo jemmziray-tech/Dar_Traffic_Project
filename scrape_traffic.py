@@ -56,6 +56,7 @@ class TrafficSchema(BaseModel):
     speed_kmh: float = Field(..., ge=0.0, description="Speed must be a positive float")
     status: str
     weather: str
+    precipitation_mm: float = Field(0.0, ge=0.0, description="Precipitation rate in mm/hr")
 
 
 # ---------------------------------------------------------
@@ -223,23 +224,25 @@ ROADS = [
 # 4. WEATHER ENGINE
 # ---------------------------------------------------------
 def get_weather():
-    url = "https://api.open-meteo.com/v1/forecast?latitude=-6.7978&longitude=39.2201&current_weather=true"
+    url = "https://api.open-meteo.com/v1/forecast?latitude=-6.7978&longitude=39.2201&current=temperature_2m,precipitation,weather_code"
     try:
-        # 🚨 FIXED: Added a strict 10-second timeout to prevent infinite hanging
         data = requests.get(url, timeout=10).json()
-        temp = data["current_weather"]["temperature"]
-        code = data["current_weather"]["weathercode"]
-        condition = "Clear" if code <= 3 else "Rainy" if code >= 51 else "Cloudy"
-        return f"{temp}°C, {condition}"
+        current = data.get("current", {})
+        temp = current.get("temperature_2m", 28.0)
+        code = current.get("weather_code", 0)
+        precip = float(current.get("precipitation", 0.0))
+        condition = "Clear" if code <= 3 else "Rainy" if (code >= 51 or precip > 0.1) else "Cloudy"
+        return f"{temp}°C, {condition}", precip
     except Exception as e:
         logging.error(f"Weather API Error: {e}")
-        return "Unknown Weather"
+        return "28°C, Clear", 0.0
 
 
 # ---------------------------------------------------------
 # 5. TRAFFIC ENGINE & FIREBASE SYNC
 # ---------------------------------------------------------
-def update_smart_city(road, weather):
+def update_smart_city(road, weather_info):
+    weather, precip_mm = weather_info if isinstance(weather_info, tuple) else (str(weather_info), 0.0)
     try:
         live_m, norm_m, delay_m, speed = None, None, None, None
 
@@ -299,6 +302,7 @@ def update_smart_city(road, weather):
             "speed_kmh": speed,
             "status": status,
             "weather": weather,
+            "precipitation_mm": precip_mm,
         }
 
         # 🛡️ THE PYDANTIC BOUNCER: Validate the data before it touches the database

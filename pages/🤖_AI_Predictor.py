@@ -93,6 +93,7 @@ def build_features_df(road_ids, target_day, hour_fraction, target_weather):
     int_hr = int(hour_fraction)
     is_rush = 1 if int_hr in [7, 8, 16, 17, 18, 19] else 0
     is_rain = 1 if "Rain" in str(target_weather) else 0
+    precip = 5.0 if is_rain else 0.0
 
     return pd.DataFrame(
         [
@@ -104,6 +105,7 @@ def build_features_df(road_ids, target_day, hour_fraction, target_weather):
                 "is_rush_hour": is_rush,
                 "temp_c": 28.0,
                 "is_raining": is_rain,
+                "precipitation_mm": precip,
                 "delay_velocity": 0.0,
             }
             for r_id in r_list

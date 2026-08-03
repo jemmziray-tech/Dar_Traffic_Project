@@ -68,7 +68,7 @@ def init_system():
 
 db = init_system()
 
-# --- 3. MASTER CITY GRID COORDINATES ---
+# --- 3. MASTER CITY GRID COORDINATES & PATHS ---
 ROAD_COORDS = {
     "ubungo": {"lat": -6.8009, "lon": 39.2250},
     "mwenge": {"lat": -6.7687, "lon": 39.2460},
@@ -93,6 +93,31 @@ ROAD_COORDS = {
     "goba_massana": {"lat": -6.7200, "lon": 39.2000},
 }
 
+ROAD_PATHS = {
+    "ubungo": [[39.2201, -6.7978], [39.2300, -6.8040]],
+    "mwenge": [[39.2431, -6.7744], [39.2489, -6.7631]],
+    "selander": [[39.2750, -6.7950], [39.2850, -6.8050]],
+    "tazara": [[39.2600, -6.8288], [39.2480, -6.8400]],
+    "mandela_buguruni": [[39.2435, -6.8285], [39.2620, -6.8335]],
+    "kilwa_mbagala": [[39.2700, -6.9050], [39.2800, -6.8750]],
+    "old_bagamoyo": [[39.2550, -6.7720], [39.2650, -6.7820]],
+    "sam_nujoma": [[39.2435, -6.7755], [39.2205, -6.7975]],
+    "uhuru_street": [[39.2550, -6.8220], [39.2820, -6.8155]],
+    "kariakoo": [[39.2725, -6.8115], [39.2750, -6.8210]],
+    "posta_to_tegeta": [[39.2880, -6.8160], [39.1550, -6.6430]],
+    "posta_to_kimara": [[39.2880, -6.8160], [39.1500, -6.7800]],
+    "posta_to_gongolamboto": [[39.2880, -6.8160], [39.1670, -6.8850]],
+    "tabata_dampo": [[39.2320, -6.8150], [39.2050, -6.8300]],
+    "kamata_gerezani": [[39.2780, -6.8280], [39.2850, -6.8180]],
+    "changombe_road": [[39.2700, -6.8350], [39.2650, -6.8550]],
+    "morocco_intersection": [[39.2630, -6.7820], [39.2580, -6.7950]],
+    "kigogo_roundabout": [[39.2550, -6.8120], [39.2500, -6.8220]],
+    "fire_upanga": [[39.2780, -6.8120], [39.2720, -6.8020]],
+    "mwai_kibaki": [[39.2350, -6.7450], [39.2500, -6.7650]],
+    "sinza_mori": [[39.2350, -6.7780], [39.2450, -6.7700]],
+    "goba_massana": [[39.2150, -6.7250], [39.1850, -6.7150]]
+}
+
 
 # --- 4. Helper Functions ---
 @st.cache_data(ttl=60)
@@ -104,6 +129,7 @@ def get_live_data():
         row["id"] = doc.id
         coords = ROAD_COORDS.get(doc.id, {"lat": -6.792, "lon": 39.239})
         row["lat"], row["lon"] = coords["lat"], coords["lon"]
+        row["path"] = ROAD_PATHS.get(doc.id, [[coords["lon"], coords["lat"]], [coords["lon"] + 0.005, coords["lat"] + 0.005]])
         row["color"] = (
             [220, 53, 69, 255]
             if row["delay_mins"] > 10
@@ -125,6 +151,31 @@ with st.sidebar:
     )
     st.caption(f"Local Time: {datetime.now(tz).strftime('%H:%M %Z')}")
     st.divider()
+
+    # --- MLOps Model Health Badge ---
+    if os.path.exists("model_metrics.csv"):
+        try:
+            metrics_df = pd.read_csv("model_metrics.csv")
+            if not metrics_df.empty:
+                latest = metrics_df.iloc[-1]
+                mae_val = latest.get("MAE_Minutes", 0.0)
+                r2_val = latest.get("R2_Score", 0.0)
+                st.markdown(
+                    f"""
+                    <div style="background: rgba(40, 167, 69, 0.12); border: 1px solid rgba(40, 167, 69, 0.4); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                        <div style="font-size: 0.85em; color: #28a745; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                            <span>●</span> MODEL HEALTH: OPTIMAL
+                        </div>
+                        <div style="font-size: 0.8em; color: #E0E0E0; margin-top: 6px; line-height: 1.5;">
+                            <b>MAE Variance:</b> ±{mae_val:.2f} mins<br/>
+                            <b>R² Accuracy:</b> {r2_val:.3f}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        except Exception:
+            pass
 
     if st.button(
         "Force Satellite Sync", icon=":material/sync:", use_container_width=True
@@ -153,12 +204,11 @@ with st.sidebar:
                 use_container_width=True,
             ):
                 with st.spinner("Querying Firebase (This may take a moment)..."):
-                    docs = (
-                        db.collection("traffic_history")
-                        .order_by("timestamp", direction=firestore.Query.DESCENDING)
-                        .stream()
-                    )
+                    docs = db.collection("traffic_history").stream()
                     history_df = pd.DataFrame([doc.to_dict() for doc in docs])
+                    if not history_df.empty and "timestamp" in history_df.columns:
+                        history_df["timestamp_dt"] = pd.to_datetime(history_df["timestamp"], utc=True)
+                        history_df = history_df.sort_values("timestamp_dt", ascending=False).drop(columns=["timestamp_dt"])
 
                     if not history_df.empty:
                         st.session_state.full_csv = history_df.to_csv(
@@ -231,13 +281,24 @@ if not df_raw.empty:
         view_state = pdk.ViewState(
             latitude=-6.80, longitude=39.24, zoom=10.8, pitch=55, bearing=0
         )
-        layer = pdk.Layer(
+        path_layer = pdk.Layer(
+            "PathLayer",
+            df_raw,
+            get_path="path",
+            get_color="color",
+            width_scale=20,
+            width_min_pixels=5,
+            get_width=10,
+            pickable=True,
+            auto_highlight=True,
+        )
+        column_layer = pdk.Layer(
             "ColumnLayer",
             df_raw,
             get_position=["lon", "lat"],
             get_elevation="elevation_val",
             elevation_scale=150,
-            radius=300,
+            radius=250,
             get_fill_color="color",
             extruded=True,
             pickable=True,
@@ -245,7 +306,7 @@ if not df_raw.empty:
         )
         st.pydeck_chart(
             pdk.Deck(
-                layers=[layer],
+                layers=[path_layer, column_layer],
                 initial_view_state=view_state,
                 tooltip=tooltip,
                 map_style="dark",

@@ -140,6 +140,9 @@ df["condition"] = df["weather"].apply(
     lambda x: str(x).split(", ")[1] if ", " in str(x) else "Clear"
 )
 df["is_raining"] = df["condition"].apply(lambda x: 1 if "Rain" in str(x) else 0)
+if "precipitation_mm" not in df.columns:
+    df["precipitation_mm"] = 0.0
+df["precipitation_mm"] = df["precipitation_mm"].fillna(0.0).astype(float)
 
 # 🌪️ TRAFFIC VELOCITY ENGINEERING (The V3 Upgrade)
 print("🌪️ Calculating 20-Minute Traffic Velocity (Delta)...")
@@ -160,6 +163,7 @@ features = [
     "is_rush_hour",
     "temp_c",
     "is_raining",
+    "precipitation_mm",
     "delay_velocity",
 ]
 X = df[features]
@@ -186,6 +190,7 @@ preprocessor = ColumnTransformer(
                 "is_rush_hour",
                 "temp_c",
                 "is_raining",
+                "precipitation_mm",
                 "delay_velocity",
             ],
         ),

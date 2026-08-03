@@ -18,6 +18,7 @@ class TrafficQuery(BaseModel):
     timestamp: str  # e.g., "2026-05-29 17:30:00"
     temperature_c: float  # e.g., 25.2
     is_raining: int  # 1 if raining, 0 if clear
+    precipitation_mm: float = 0.0  # Precipitation rate in mm/hr
     delay_velocity: float  # The change in delay over the last 20 mins (e.g., 5.0 means getting worse)
 
 
@@ -77,6 +78,7 @@ def predict_traffic(query: TrafficQuery):
                     "is_rush_hour": is_rush_hour,
                     "temp_c": query.temperature_c,
                     "is_raining": query.is_raining,
+                    "precipitation_mm": query.precipitation_mm,
                     "delay_velocity": query.delay_velocity,
                 }
             ]

@@ -461,6 +461,9 @@ with tab4:
                     df_val["is_rush_hour"] = df_val["hour"].apply(lambda x: 1 if x in [7, 8, 16, 17, 18, 19] else 0)
                     df_val["temp_c"] = 28.0
                     df_val["is_raining"] = df_val["weather"].apply(lambda x: 1 if "Rain" in str(x) else 0)
+                    if "precipitation_mm" not in df_val.columns:
+                        df_val["precipitation_mm"] = 0.0
+                    df_val["precipitation_mm"] = df_val["precipitation_mm"].fillna(0.0).astype(float)
                     df_val["delay_velocity"] = 0.0
 
                     pred_features = df_val[
@@ -472,6 +475,7 @@ with tab4:
                             "is_rush_hour",
                             "temp_c",
                             "is_raining",
+                            "precipitation_mm",
                             "delay_velocity",
                         ]
                     ]
