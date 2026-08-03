@@ -3,4 +3,6 @@ googlemaps
 firebase-admin
 python-dotenv
 pydantic
-pytest
+pytz
+numpy
+pytest
