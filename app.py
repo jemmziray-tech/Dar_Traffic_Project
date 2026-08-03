@@ -22,21 +22,135 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- CUSTOM CSS ---
+# --- PREMIUM DESIGN SYSTEM CSS ---
 st.markdown(
     """
 <style>
-.blob { border-radius: 50%; margin-right: 8px; height: 10px; width: 10px; display: inline-block; transform: scale(1); }
-.blob.green { background: rgba(40, 167, 69, 1); box-shadow: 0 0 8px rgba(40, 167, 69, 0.8); animation: pulse 2s infinite;}
-.blob.yellow { background: rgba(255, 193, 7, 1); box-shadow: 0 0 8px rgba(255, 193, 7, 0.8); }
-.blob.red { background: rgba(220, 53, 69, 1); box-shadow: 0 0 8px rgba(220, 53, 69, 0.8); }
-@keyframes pulse { 
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); } 
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); } 
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); } 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+html, body, [class*="css"], .stApp {
+    font-family: 'Inter', sans-serif !important;
+    background-color: #0A0F1E;
+    color: #E8EAF0;
 }
-div[data-testid="stMetricValue"] { font-weight: 600; letter-spacing: -0.5px; }
-.block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+
+/* --- Sidebar --- */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0D1426 0%, #0A0F1E 100%) !important;
+    border-right: 1px solid rgba(0, 212, 255, 0.1);
+}
+[data-testid="stSidebar"] * { font-family: 'Inter', sans-serif !important; }
+
+/* --- Main container padding --- */
+.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 98%; }
+
+/* --- Metric values --- */
+div[data-testid="stMetricValue"] {
+    font-weight: 700;
+    font-size: 1.6rem !important;
+    letter-spacing: -0.5px;
+    color: #FFFFFF;
+}
+div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* --- KPI card glow --- */
+.kpi-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(0, 212, 255, 0.15);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.kpi-card:hover { border-color: rgba(0, 212, 255, 0.4); box-shadow: 0 0 20px rgba(0, 212, 255, 0.08); }
+
+/* --- Road telemetry cards --- */
+.road-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 2px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.road-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.road-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 10px 0 0 10px;
+}
+.road-card.smooth::before { background: #2ED573; box-shadow: 0 0 8px rgba(46,213,115,0.6); }
+.road-card.moderate::before { background: #FFA502; box-shadow: 0 0 8px rgba(255,165,2,0.6); }
+.road-card.jammed::before { background: #FF4757; box-shadow: 0 0 8px rgba(255,71,87,0.6); }
+
+.road-name { font-size: 0.72rem; font-weight: 600; color: #8892A4; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 6px; }
+.road-speed { font-size: 1.5rem; font-weight: 800; color: #FFFFFF; line-height: 1.1; }
+.road-speed span { font-size: 0.75rem; font-weight: 400; color: #8892A4; }
+.delay-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-top: 6px;
+}
+.delay-badge.smooth { background: rgba(46,213,115,0.12); color: #2ED573; border: 1px solid rgba(46,213,115,0.3); }
+.delay-badge.moderate { background: rgba(255,165,2,0.12); color: #FFA502; border: 1px solid rgba(255,165,2,0.3); }
+.delay-badge.jammed { background: rgba(255,71,87,0.12); color: #FF4757; border: 1px solid rgba(255,71,87,0.3); }
+
+.weather-tag { font-size: 0.68rem; color: #5C6680; margin-top: 4px; }
+.speed-bar-bg { background: rgba(255,255,255,0.06); border-radius: 4px; height: 4px; margin-top: 8px; overflow: hidden; }
+.speed-bar-fill { height: 4px; border-radius: 4px; transition: width 0.5s ease; }
+
+/* --- Section headers --- */
+.section-header { font-size: 0.72rem; font-weight: 600; color: #00D4FF; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
+
+/* --- Pulsing live dot --- */
+.blob { border-radius: 50%; margin-right: 8px; height: 10px; width: 10px; display: inline-block; }
+.blob.green { background: #2ED573; box-shadow: 0 0 8px rgba(46,213,115,0.8); animation: pulse 2s infinite; }
+.blob.yellow { background: #FFA502; box-shadow: 0 0 8px rgba(255,165,2,0.8); }
+.blob.red { background: #FF4757; box-shadow: 0 0 8px rgba(255,71,87,0.8); }
+@keyframes pulse {
+    0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46,213,115,0.7); }
+    70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(46,213,115,0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46,213,115,0); }
+}
+
+/* --- Buttons --- */
+.stButton > button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-family: 'Inter', sans-serif !important;
+    transition: all 0.2s !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #00D4FF, #0099CC) !important;
+    border: none !important;
+    color: #0A0F1E !important;
+}
+.stButton > button[kind="primary"]:hover { box-shadow: 0 0 20px rgba(0,212,255,0.4) !important; }
+
+/* --- Network status card --- */
+.net-status-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 18px;
+}
+
+/* --- Hero title --- */
+.hero-title { font-size: 2rem; font-weight: 800; color: #FFFFFF; letter-spacing: -1px; line-height: 1.2; }
+.hero-sub { font-size: 0.85rem; color: #5C6680; font-weight: 400; margin-top: 4px; }
+.live-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(46,213,115,0.1); border: 1px solid rgba(46,213,115,0.25);
+    color: #2ED573; font-size: 0.72rem; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px; letter-spacing: 0.5px;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -245,20 +359,47 @@ if not df_raw.empty:
     efficiency = 100 - min((total_delay / 250) * 100, 100)
     total_wasted_tzs = total_delay * 101 * 750
 
+    # Hero header
+    h1, h2 = st.columns([3, 1])
+    with h1:
+        st.markdown(f"""
+        <div class="hero-title">Dar es Salaam Traffic Command</div>
+        <div class="hero-sub">Smart City Digital Twin — Real-Time Infrastructure Intelligence</div>
+        """, unsafe_allow_html=True)
+    with h2:
+        st.markdown(f"""
+        <div style="text-align:right; padding-top: 8px;">
+            <span class="live-badge"><span style="width:7px;height:7px;background:#2ED573;border-radius:50%;display:inline-block;"></span> LIVE NETWORK</span>
+            <div style="font-size:0.75rem; color:#5C6680; margin-top:4px;">{datetime.now(tz).strftime('%H:%M %Z · %d %b %Y')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+
+    # Premium KPI row
+    friction_str = f"{total_wasted_tzs/1000000:.1f}M TZS" if total_wasted_tzs >= 1000000 else f"{total_wasted_tzs:,.0f} TZS"
+    eff_color = "#2ED573" if efficiency > 70 else ("#FFA502" if efficiency > 40 else "#FF4757")
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Network Efficiency", f"{efficiency:.1f}%")
-    k2.metric("Average Velocity", f"{avg_speed:.1f} km/h")
-    k3.metric("Cumulative Gridlock", f"{total_delay} Mins")
-    k4.metric(
-        "Capital Friction (Live)",
-        (
-            f"{total_wasted_tzs / 1000000:.1f}M TZS"
-            if total_wasted_tzs >= 1000000
-            else f"{total_wasted_tzs:,.0f} TZS"
-        ),
-        delta="Wasted Productivity",
-        delta_color="inverse",
-    )
+    k1.markdown(f"""<div class="kpi-card">
+        <div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Network Efficiency</div>
+        <div style="font-size:2rem;font-weight:800;color:{eff_color};margin:6px 0;">{efficiency:.1f}%</div>
+        <div style="font-size:0.72rem;color:#5C6680;">{'Optimal Flow' if efficiency > 70 else ('Moderate Stress' if efficiency > 40 else 'Critical Load')}</div>
+    </div>""", unsafe_allow_html=True)
+    k2.markdown(f"""<div class="kpi-card">
+        <div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Average Velocity</div>
+        <div style="font-size:2rem;font-weight:800;color:#00D4FF;margin:6px 0;">{avg_speed:.1f} <span style='font-size:1rem;color:#5C6680;'>km/h</span></div>
+        <div style="font-size:0.72rem;color:#5C6680;">City-wide mean speed</div>
+    </div>""", unsafe_allow_html=True)
+    k3.markdown(f"""<div class="kpi-card">
+        <div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Cumulative Gridlock</div>
+        <div style="font-size:2rem;font-weight:800;color:#FFA502;margin:6px 0;">{total_delay} <span style='font-size:1rem;color:#5C6680;'>mins</span></div>
+        <div style="font-size:0.72rem;color:#5C6680;">Across all corridors</div>
+    </div>""", unsafe_allow_html=True)
+    k4.markdown(f"""<div class="kpi-card">
+        <div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Capital Friction</div>
+        <div style="font-size:2rem;font-weight:800;color:#FF4757;margin:6px 0;">{friction_str}</div>
+        <div style="font-size:0.72rem;color:#5C6680;">Wasted productivity</div>
+    </div>""", unsafe_allow_html=True)
 
     st.write("")
 
@@ -319,104 +460,88 @@ if not df_raw.empty:
     col_alerts, col_feed = st.columns([1, 2], gap="large")
 
     with col_alerts:
-        with st.container(border=True):
-            st.subheader(":material/gpp_maybe: Network Status")
-            bottleneck_row = df_raw.loc[df_raw["delay_mins"].idxmax()]
-            if total_delay > 150:
-                st.error(
-                    f"**Critical:** Severe volume at {bottleneck_row['name']}.",
-                    icon=":material/gpp_bad:",
-                )
-            elif "Rain" in str(df_raw["weather"].iloc[0]) or "Drizzle" in str(
-                df_raw["weather"].iloc[0]
-            ):
-                st.warning(
-                    "**Weather:** Precipitation impacting flow.",
-                    icon=":material/water_drop:",
-                )
-            else:
-                st.success(
-                    "**Optimal:** Arteries flowing nominally.",
-                    icon=":material/gpp_good:",
-                )
+        # Network Status
+        bottleneck_row = df_raw.loc[df_raw["delay_mins"].idxmax()]
+        if total_delay > 150:
+            status_icon, status_color, status_label = "⚠️", "#FF4757", f"Critical congestion on {bottleneck_row['name']}"
+        elif "Rain" in str(df_raw["weather"].iloc[0]) or "Drizzle" in str(df_raw["weather"].iloc[0]):
+            status_icon, status_color, status_label = "🌧️", "#FFA502", "Precipitation detected — speeds reduced"
+        else:
+            status_icon, status_color, status_label = "✅", "#2ED573", "All arteries flowing nominally"
 
-            st.write(f"**Structural Efficiency:** {efficiency:.1f}%")
-            st.progress(efficiency / 100)
+        eff_bar_pct = int(efficiency)
+        st.markdown(f"""
+        <div class="net-status-card" style="margin-bottom:16px;">
+            <div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">⬡ Network Status</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                <span style="font-size:1.4rem;">{status_icon}</span>
+                <div>
+                    <div style="font-size:0.85rem;font-weight:600;color:{status_color};">{status_label}</div>
+                    <div style="font-size:0.72rem;color:#5C6680;">Structural Efficiency: {efficiency:.1f}%</div>
+                </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);border-radius:6px;height:6px;overflow:hidden;">
+                <div style="width:{eff_bar_pct}%;height:6px;background:linear-gradient(90deg,{status_color},{status_color}88);border-radius:6px;"></div>
+            </div>
+            <div style="font-size:0.7rem;color:#5C6680;margin-top:8px;">Worst: <span style='color:#FF4757;font-weight:600;'>{bottleneck_row['name']}</span> (+{bottleneck_row['delay_mins']} mins)</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.write("")
-
-        with st.container(border=True):
-            st.subheader(":material/robot_2: AI Executive Briefing")
-            st.caption("Generates a live macro-summary for logistics planning.")
-            gemini_key = os.getenv("GEMINI_API_KEY") or (
-                st.secrets.get("GEMINI_API_KEY")
-                if "GEMINI_API_KEY" in st.secrets
-                else None
-            )
-
-            if gemini_key:
-                genai.configure(api_key=gemini_key)
-                if st.button(
-                    "Generate Dispatch Report",
-                    type="primary",
-                    use_container_width=True,
-                    icon=":material/graphic_eq:",
-                ):
-                    with st.spinner("Analyzing macro-level routing data..."):
-                        try:
-                            prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
-                            response = genai.GenerativeModel(
-                                "gemini-2.5-flash"
-                            ).generate_content(prompt)
-                            st.info(response.text)
-                        except Exception as e:
-                            st.error(f"Generative AI API Error: {e}")
-            else:
-                st.info(
-                    "Provide GEMINI_API_KEY in environment to enable AI Briefings.",
-                    icon=":material/key:",
-                )
+        # AI Briefing
+        st.markdown('<div class="net-status-card">', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">🤖 AI Executive Briefing</div>', unsafe_allow_html=True)
+        st.caption("Live macro-summary for logistics & fleet planning.")
+        gemini_key = os.getenv("GEMINI_API_KEY") or (
+            st.secrets.get("GEMINI_API_KEY")
+            if "GEMINI_API_KEY" in st.secrets
+            else None
+        )
+        if gemini_key:
+            genai.configure(api_key=gemini_key)
+            if st.button("Generate Dispatch Report", type="primary", use_container_width=True, icon=":material/graphic_eq:"):
+                with st.spinner("Analyzing macro-level routing data..."):
+                    try:
+                        prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
+                        response = genai.GenerativeModel("gemini-2.5-flash").generate_content(prompt)
+                        st.markdown(f'<div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:12px;font-size:0.85rem;color:#C8D0E0;line-height:1.6;margin-top:10px;">{response.text}</div>', unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"AI Error: {e}")
+        else:
+            st.info("Add GEMINI_API_KEY to enable AI Briefings.", icon=":material/key:")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_feed:
-        st.subheader(":material/table: Live Node Telemetry Feed")
-        df_sorted = df_raw.sort_values(by="delay_mins", ascending=False).reset_index(
-            drop=True
-        )
+        st.markdown('<div class="section-header">◈ Live Node Telemetry Feed</div>', unsafe_allow_html=True)
+        df_sorted = df_raw.sort_values(by="delay_mins", ascending=False).reset_index(drop=True)
 
         num_cols = 3
         for i in range(0, min(9, len(df_sorted)), num_cols):
             chunk = df_sorted.iloc[i : i + num_cols]
             cols = st.columns(num_cols)
             for index, row in chunk.reset_index().iterrows():
+                d = row["delay_mins"]
+                s = row["speed_kmh"]
+                card_class = "smooth" if d <= 4 else ("moderate" if d <= 10 else "jammed")
+                badge_class = card_class
+                badge_text = ("SMOOTH" if d <= 4 else ("MODERATE" if d <= 10 else "HEAVY JAM"))
+                bar_color = ("#2ED573" if d <= 4 else ("#FFA502" if d <= 10 else "#FF4757"))
+                bar_pct = min(int(s / 50 * 100), 100)
+                w_icon = "🌧️" if "Rain" in str(row['weather']) else ("☁️" if "Cloud" in str(row['weather']) else "☀️")
                 with cols[index]:
-                    css_class = (
-                        "green"
-                        if row["delay_mins"] <= 4
-                        else ("yellow" if row["delay_mins"] <= 10 else "red")
-                    )
-                    with st.container(border=True):
-                        st.markdown(
-                            f"""
-                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                                <div class="blob {css_class}"></div>
-                                <span style="font-weight: 600; font-size: 0.85em; color: #E0E0E0;">{row['name'].upper()}</span>
-                            </div>
-                        """,
-                            unsafe_allow_html=True,
-                        )
-                        st.metric(
-                            label="Calculated Velocity",
-                            value=f"{row['speed_kmh']} km/h",
-                            delta=f"{row['delay_mins']} min delay",
-                            delta_color="inverse",
-                        )
-                        st.progress(min(row["speed_kmh"] / 50.0, 1.0))
-                        st.caption(f":material/filter_drama: {row['weather'].upper()}")
+                    st.markdown(f"""
+                    <div class="road-card {card_class}">
+                        <div class="road-name">{row['name']}</div>
+                        <div class="road-speed">{s} <span>km/h</span></div>
+                        <div class="speed-bar-bg"><div class="speed-bar-fill" style="width:{bar_pct}%;background:{bar_color};"></div></div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                            <span class="delay-badge {badge_class}">{badge_text} +{d}m</span>
+                            <span class="weather-tag">{w_icon} {row['weather'].split(',')[1].strip() if ',' in str(row['weather']) else row['weather']}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
         if len(df_sorted) > 9:
-            st.caption(
-                f"... and {len(df_sorted) - 9} other nodes operating within nominal thresholds."
-            )
+            st.markdown(f'<div style="font-size:0.72rem;color:#5C6680;margin-top:8px;">+{len(df_sorted)-9} more nodes within nominal thresholds</div>', unsafe_allow_html=True)
 
 else:
-    st.info("Awaiting telemetry uplink...", icon=":material/cell_tower:")
+    st.markdown('<div style="text-align:center;padding:60px;color:#5C6680;"><div style="font-size:2rem;">📡</div><div style="font-size:1rem;margin-top:12px;">Awaiting telemetry uplink...</div></div>', unsafe_allow_html=True)

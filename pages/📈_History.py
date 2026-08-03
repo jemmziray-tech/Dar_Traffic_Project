@@ -12,16 +12,22 @@ st.set_page_config(
     page_title="Route History", layout="wide", page_icon=":material/history:"
 )
 
-# --- CUSTOM CSS ---
-st.markdown(
-    """
+# --- PREMIUM DESIGN SYSTEM CSS ---
+st.markdown("""
 <style>
-div[data-testid="stMetricValue"] { font-weight: 600; letter-spacing: -0.5px; }
-.block-container { padding-top: 2rem; padding-bottom: 2rem; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif !important; background-color: #0A0F1E; color: #E8EAF0; }
+[data-testid="stSidebar"] { background: linear-gradient(180deg, #0D1426 0%, #0A0F1E 100%) !important; border-right: 1px solid rgba(0, 212, 255, 0.1); }
+.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 98%; }
+div[data-testid="stMetricValue"] { font-weight: 700; font-size: 1.5rem !important; letter-spacing: -0.5px; color: #FFFFFF; }
+div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+.page-header { font-size: 1.8rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.8px; }
+.page-sub { font-size: 0.85rem; color: #5C6680; margin-top: 4px; }
+.section-label { font-size: 0.7rem; font-weight: 600; color: #00D4FF; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+.stat-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(0,212,255,0.12); border-radius: 10px; padding: 16px 20px; }
+.stButton > button { border-radius: 8px !important; font-weight: 600 !important; font-family: 'Inter', sans-serif !important; }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 
 # --- 2. Connect to Firebase ---
@@ -85,9 +91,8 @@ def map_weather(w):
 
 
 # --- 4. Main UI Header ---
-st.title(":material/route: Route Telemetry & History")
-st.caption("Deep historical analysis and forecasting for individual city arteries.")
-st.divider()
+st.markdown('<div class="page-header">📈 Route Telemetry & History</div><div class="page-sub">Deep historical analysis of corridor performance, congestion cycles, and environmental impact</div>', unsafe_allow_html=True)
+st.markdown("<div style='margin:16px 0;height:1px;background:linear-gradient(90deg,rgba(0,212,255,0.3),transparent);'></div>", unsafe_allow_html=True)
 
 # ROAD SELECTOR (Moved to main body for better UX)
 roads = get_roads_list()
@@ -172,8 +177,9 @@ if selected_road:
                         x=hist_df["timestamp"],
                         y=hist_df["delay_mins"],
                         fill="tozeroy",
-                        mode="none",
-                        fillcolor="rgba(220, 53, 69, 0.2)",
+                        mode="lines",
+                        line=dict(color="#00D4FF"),
+                        fillcolor="rgba(0,212,255,0.15)",
                         name="Raw Delay",
                     )
                 )
@@ -182,13 +188,16 @@ if selected_road:
                         x=hist_df["timestamp"],
                         y=hist_df["Rolling_Avg"],
                         mode="lines",
-                        line=dict(color="#dc3545", width=2),
+                        line=dict(color="#FFA502", width=2),
                         name="Trendline",
                     )
                 )
 
                 fig_area.update_layout(
                     template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="Inter", color="#8892A4"),
                     height=350,
                     margin=dict(l=0, r=0, t=10, b=0),
                     xaxis_title="",
@@ -239,8 +248,12 @@ if selected_road:
                         template="plotly_dark",
                         height=350,
                     )
-                    fig_forecast.update_traces(line_color="#00d2ff", fill="tozeroy")
+                    fig_forecast.update_traces(line_color="#00D4FF", fill="tozeroy")
                     fig_forecast.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font=dict(family="Inter", color="#8892A4"),
                         margin=dict(l=0, r=0, t=10, b=0),
                         xaxis_title="",
                         yaxis_title="Predicted Mins",
@@ -293,6 +306,10 @@ if selected_road:
                         hovertemplate="<b>%{y} at %{x}</b><br>Average Delay: %{z:.1f} mins<extra></extra>",
                     )
                     fig_heatmap.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font=dict(family="Inter", color="#8892A4"),
                         margin=dict(l=0, r=0, t=10, b=0), coloraxis_showscale=False
                     )
                     st.plotly_chart(fig_heatmap, use_container_width=True)
@@ -373,14 +390,18 @@ if selected_road:
                     color="Clean_Weather",
                     orientation="h",
                     color_discrete_map={
-                        "Clear": "#00d2ff",
-                        "Cloudy": "#9e9e9e",
-                        "Rainy": "#dc3545",
+                        "Clear": "#00D4FF",
+                        "Cloudy": "#8892A4",
+                        "Rainy": "#FF4757",
                     },
                     template="plotly_dark",
                     points="all",
                 )
                 fig_speed.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="Inter", color="#8892A4"),
                     showlegend=False,
                     height=350,
                     margin=dict(l=0, r=0, t=10, b=0),
@@ -397,13 +418,17 @@ if selected_road:
                     names="status",
                     hole=0.6,
                     color_discrete_map={
-                        "Smooth": "#28a745",
-                        "Moderate": "#ffc107",
-                        "Heavy Jam": "#dc3545",
+                        "Smooth": "#2ED573",
+                        "Moderate": "#FFA502",
+                        "Heavy Jam": "#FF4757",
                     },
                     template="plotly_dark",
                 )
                 fig_pie.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="Inter", color="#8892A4"),
                     height=350, margin=dict(l=0, r=0, t=10, b=0), showlegend=False
                 )
                 fig_pie.update_traces(textposition="inside", textinfo="percent+label")

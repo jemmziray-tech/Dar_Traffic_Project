@@ -16,10 +16,22 @@ st.set_page_config(
     page_title="Advanced Analytics", page_icon=":material/analytics:", layout="wide"
 )
 
-st.title(":material/query_stats: Enterprise Traffic Intelligence")
-st.markdown(
-    "Deep-dive business intelligence, unsupervised spatial clustering, and macro-economic impact analysis."
-)
+# --- PREMIUM DESIGN SYSTEM CSS ---
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif !important; background-color: #0A0F1E; color: #E8EAF0; }
+[data-testid="stSidebar"] { background: linear-gradient(180deg, #0D1426 0%, #0A0F1E 100%) !important; border-right: 1px solid rgba(0, 212, 255, 0.1); }
+.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 98%; }
+div[data-testid="stMetricValue"] { font-weight: 700; font-size: 1.4rem !important; letter-spacing: -0.5px; color: #FFFFFF; }
+div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+.page-header { font-size: 1.8rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.8px; }
+.page-sub { font-size: 0.85rem; color: #5C6680; margin-top: 4px; margin-bottom: 20px; }
+.stButton > button { border-radius: 8px !important; font-weight: 600 !important; }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="page-header">📊 Enterprise Traffic Intelligence</div><div class="page-sub">Deep-dive business intelligence, unsupervised spatial clustering, and macro-economic impact analysis</div>', unsafe_allow_html=True)
 
 
 # --- 2. SECURE FIREBASE CONNECTION ---
@@ -146,6 +158,12 @@ with tab1:
         height=500,
     )
     fig_heat.update_xaxes(tickmode="linear", dtick=1)
+    fig_heat.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter", color="#8892A4"),
+    )
     st.plotly_chart(fig_heat, use_container_width=True)
 
 # ------------------------------------------
@@ -183,9 +201,9 @@ with tab2:
         }
         cluster_data["Profile"] = cluster_data["Cluster_ID"].map(label_map)
         color_map = {
-            "High-Velocity Corridors": "#28a745",
-            "Rush-Hour Traps (Volatile)": "#ffc107",
-            "Chronic Gridlock Zones": "#dc3545",
+            "High-Velocity Corridors": "#2ED573",
+            "Rush-Hour Traps (Volatile)": "#FFA502",
+            "Chronic Gridlock Zones": "#FF4757",
         }
 
         fig_cluster = px.scatter(
@@ -208,6 +226,10 @@ with tab2:
         fig_cluster.update_layout(
             height=550,
             hoverlabel=dict(bgcolor="#2b2b2b", font_color="white", font_size=14),
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter", color="#8892A4"),
         )
         st.plotly_chart(fig_cluster, use_container_width=True)
     else:
@@ -256,6 +278,12 @@ with tab3:
         color_continuous_scale="Reds",
         labels={"Annual_Loss_TZS": "Annual Economic Drain (TZS)", "name": "Artery"},
         height=600,
+    )
+    fig_finance.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter", color="#8892A4"),
     )
     st.plotly_chart(fig_finance, use_container_width=True)
 
@@ -345,7 +373,13 @@ with tab4:
                         },
                         height=280,
                     )
-                    fig_importance.update_traces(marker_color="#4B8BBE")
+                    fig_importance.update_traces(marker_color="#00D4FF")
+                    fig_importance.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font=dict(family="Inter", color="#8892A4"),
+                    )
                     st.plotly_chart(fig_importance, use_container_width=True)
                 else:
                     st.warning(
@@ -490,7 +524,7 @@ with tab4:
                             y=df_val["delay_mins"],
                             mode="lines+markers",
                             name="Actual Traffic Delay",
-                            line=dict(color="#e74c3c", width=3),
+                            line=dict(color="#FF4757", width=3),
                             marker=dict(size=6),
                         )
                     )
@@ -500,11 +534,14 @@ with tab4:
                             y=df_val["Predicted_Delay"],
                             mode="lines",
                             name="AI Predicted Delay",
-                            line=dict(color="#4B8BBE", width=3, dash="dash"),
+                            line=dict(color="#00D4FF", width=3, dash="dash"),
                         )
                     )
                     fig_val.update_layout(
                         template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font=dict(family="Inter", color="#8892A4"),
                         xaxis_title="Time of Day",
                         yaxis_title="Delay (Minutes)",
                         hovermode="x unified",
