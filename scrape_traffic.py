@@ -226,19 +226,70 @@ ROADS = [
 # ---------------------------------------------------------
 # 4. WEATHER ENGINE
 # ---------------------------------------------------------
-def get_weather():
-    url = "https://api.open-meteo.com/v1/forecast?latitude=-6.7978&longitude=39.2201&current=temperature_2m,precipitation,weather_code"
-    try:
-        data = requests.get(url, timeout=10).json()
-        current = data.get("current", {})
-        temp = current.get("temperature_2m", 28.0)
-        code = current.get("weather_code", 0)
+def get_weather_for_all_roads(roads: list) -> dict:
+    """
+    Fetch weather for every road using the Open-Meteo bulk API.
+    One HTTP request returns per-location results for all roads simultaneously.
+    Returns: dict keyed by road['id'] -> (weather_str, precip_mm)
+    """
+    # Build comma-separated lat/lon lists from each road's start coordinate
+    lats, lons, ids = [], [], []
+    for road in roads:
+        try:
+            lat_str, lon_str = road["start"].split(",")
+            lats.append(lat_str.strip())
+            lons.append(lon_str.strip())
+            ids.append(road["id"])
+        except Exception:
+            # Fallback: use Dar es Salaam city centre if coords are malformed
+            lats.append("-6.7978")
+            lons.append("39.2201")
+            ids.append(road["id"])
+
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={','.join(lats)}"
+        f"&longitude={','.join(lons)}"
+        "&current=temperature_2m,precipitation,weather_code"
+        "&timezone=Africa%2FDar_es_Salaam"
+    )
+
+    def parse_response(current: dict) -> tuple:
+        temp   = current.get("temperature_2m", 28.0)
+        code   = current.get("weather_code", 0)
         precip = float(current.get("precipitation", 0.0))
-        condition = "Clear" if code <= 3 else "Rainy" if (code >= 51 or precip > 0.1) else "Cloudy"
+        if code >= 51 or precip > 0.1:
+            condition = "Rainy"
+        elif code >= 4:
+            condition = "Cloudy"
+        else:
+            condition = "Clear"
         return f"{temp}°C, {condition}", precip
+
+    try:
+        data = requests.get(url, timeout=15).json()
+        result = {}
+
+        # Single road returns a plain dict; multiple roads return a list
+        if isinstance(data, list):
+            for i, location_data in enumerate(data):
+                road_id = ids[i]
+                current = location_data.get("current", {})
+                result[road_id] = parse_response(current)
+        else:
+            # Only one location (fallback if API collapses to single response)
+            current = data.get("current", {})
+            parsed = parse_response(current)
+            for road_id in ids:
+                result[road_id] = parsed
+
+        logging.info(f"Weather fetched for {len(result)} road locations.")
+        return result
+
     except Exception as e:
-        logging.error(f"Weather API Error: {e}")
-        return "28°C, Clear", 0.0
+        logging.error(f"Bulk Weather API Error: {e}")
+        # Return a safe default for all roads
+        return {road["id"]: ("28°C, Clear", 0.0) for road in roads}
 
 
 # ---------------------------------------------------------
@@ -375,7 +426,9 @@ if __name__ == "__main__":
     else:
         gmaps = None
 
-    current_weather = get_weather()
+    # Fetch per-road weather in a single bulk API call
+    logging.info("Fetching per-road weather via Open-Meteo bulk API...")
+    road_weather_map = get_weather_for_all_roads(ROADS)
 
     logging.info(
         "Initiating high-speed concurrent scraping (ThreadPoolExecutor)..."
@@ -383,9 +436,11 @@ if __name__ == "__main__":
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = [
-            executor.submit(update_smart_city, r, current_weather) for r in ROADS
+            executor.submit(update_smart_city, r, road_weather_map.get(r["id"], ("28°C, Clear", 0.0)))
+            for r in ROADS
         ]
         concurrent.futures.wait(futures)
 
     logging.info("Sync Complete!")
+
 
