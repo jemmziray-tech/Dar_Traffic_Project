@@ -2,8 +2,8 @@ name: Traffic Scraper Automation
 
 on:
   schedule:
-    # Runs every 20 minutes automatically
-    - cron: '*/20 * * * *'
+    # Runs every 20 minutes between 05:00 AM and 00:00 AM EATS (Dar es Salaam time -> 02:00 to 21:59 UTC)
+    - cron: '*/20 2-21 * * *'
 
   # Triggered by Google Cloud Scheduler if configured
   repository_dispatch:
