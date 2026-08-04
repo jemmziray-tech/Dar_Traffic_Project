@@ -19,8 +19,8 @@ from firebase_admin import credentials, firestore
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import TargetEncoder
 from sklearn.metrics import mean_absolute_error, r2_score
-import category_encoders as ce
 from xgboost import XGBRegressor
 
 print("🚀 Booting Advanced Enterprise AI Training Pipeline (V3 XGBoost + Velocity)...")
@@ -194,7 +194,7 @@ preprocessor = ColumnTransformer(
                 "delay_velocity",
             ],
         ),
-        ("cat", ce.TargetEncoder(), ["road_id"]),
+        ("cat", TargetEncoder(), ["road_id"]),
     ]
 )
 
