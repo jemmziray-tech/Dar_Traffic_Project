@@ -40,12 +40,25 @@ def get_db():
     if not firebase_admin._apps:
         firebase_secret = os.getenv("FIREBASE_KEY_JSON")
         if firebase_secret:
-            cred_dict = json.loads(firebase_secret)
-            cred = credentials.Certificate(cred_dict)
-        else:
+            # GitHub Actions / local environment variable
+            cred = credentials.Certificate(json.loads(firebase_secret))
+        elif "firebase" in st.secrets:
+            # Streamlit Cloud — reads from st.secrets
+            key_dict = (
+                json.loads(st.secrets["firebase"]["key_data"])
+                if "key_data" in st.secrets["firebase"]
+                else dict(st.secrets["firebase"])
+            )
+            cred = credentials.Certificate(key_dict)
+        elif os.path.exists("firebase-key.json"):
+            # Local development fallback
             cred = credentials.Certificate("firebase-key.json")
+        else:
+            st.error("Authentication failure: No Firebase credentials found.", icon=":material/lock:")
+            st.stop()
         firebase_admin.initialize_app(cred)
     return firestore.client()
+
 
 
 # --- 3. DATA FETCHING & SANITIZATION ---
