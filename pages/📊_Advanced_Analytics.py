@@ -388,11 +388,24 @@ with tab4:
                     )
             except Exception as e:
                 st.error(f"Failed to unbox model: {e}", icon=":material/error:")
-        else:
-            st.info(
-                "Awaiting traffic_model.pkl to compute Explainable AI matrix.",
-                icon=":material/info:",
-            )
+            st.markdown("""
+            <div style="background:rgba(255,165,2,0.06);border:1px solid rgba(255,165,2,0.2);
+                        border-radius:12px;padding:20px 24px;margin-top:8px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#FFA502;letter-spacing:1px;
+                            text-transform:uppercase;margin-bottom:8px;">⚠ Model File Not Detected</div>
+                <div style="font-size:0.85rem;color:#C8D0E0;line-height:1.6;">
+                    <code style="background:rgba(255,255,255,0.07);padding:2px 6px;
+                                 border-radius:4px;font-size:0.8rem;">traffic_model.pkl</code>
+                    not found in the app directory.<br><br>
+                    The model will be retrained automatically by the GitHub Actions daily pipeline.
+                    Check back after the next scheduled run, or retrain manually by running
+                    <code style="background:rgba(255,255,255,0.07);padding:2px 6px;
+                                 border-radius:4px;font-size:0.8rem;">python train_model.py</code>
+                    locally and pushing the result.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
 
     with col_metrics:
         st.subheader("System Accuracy")
