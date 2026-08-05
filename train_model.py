@@ -69,6 +69,26 @@ try:
         firebase_admin.initialize_app(cred)
 
     db = firestore.client()
+    
+    # 🧹 Auto-Prune Old Data (> 60 days) to save Firestore costs
+    print("🧹 Checking for old telemetry data to prune...")
+    try:
+        prune_date = datetime.now() - timedelta(days=60)
+        old_docs = db.collection("traffic_history").where("timestamp", "<", prune_date).stream()
+        prune_count = 0
+        batch = db.batch()
+        for doc in old_docs:
+            batch.delete(doc.reference)
+            prune_count += 1
+            if prune_count % 400 == 0:
+                batch.commit()
+        if prune_count > 0 and prune_count % 400 != 0:
+            batch.commit()
+        if prune_count > 0:
+            print(f"🗑️ Pruned {prune_count} old records.")
+    except Exception as prune_err:
+        print(f"⚠️ Pruning skipped: {prune_err}")
+
     docs = list(db.collection("traffic_history").stream())
 except Exception as err:
     print(f"⚠️ Firebase Stream Warning: {err}")

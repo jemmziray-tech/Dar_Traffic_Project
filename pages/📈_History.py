@@ -133,7 +133,18 @@ if selected_road:
         )
         delay_delta = current_delay - historical_avg
 
-        st.subheader(f"{format_road_name(selected_road)}")
+        col_title, col_download = st.columns([3, 1])
+        with col_title:
+            st.subheader(f"{format_road_name(selected_road)}")
+        with col_download:
+            csv_data = hist_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Export CSV",
+                data=csv_data,
+                file_name=f"{selected_road}_traffic_history.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Live Status", current_status)

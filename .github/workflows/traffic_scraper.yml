@@ -37,3 +37,15 @@ jobs:
           FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: python scrape_traffic.py
+
+      - name: Report Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Traffic Scraper Failed!',
+              body: `The scheduled scraper job failed. Please check the [Actions Logs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.`
+            })
