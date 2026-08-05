@@ -1,6 +1,5 @@
 import os
 import json
-import time
 from datetime import datetime
 import pytz
 import pandas as pd
@@ -217,7 +216,6 @@ ROAD_PATHS = {
     "old_bagamoyo": [[39.2550, -6.7720], [39.2650, -6.7820]],
     "sam_nujoma": [[39.2435, -6.7755], [39.2205, -6.7975]],
     "uhuru_street": [[39.2550, -6.8220], [39.2820, -6.8155]],
-    "kariakoo": [[39.2725, -6.8115], [39.2750, -6.8210]],
     "posta_to_tegeta": [[39.2880, -6.8160], [39.1550, -6.6430]],
     "posta_to_kimara": [[39.2880, -6.8160], [39.1500, -6.7800]],
     "posta_to_gongolamboto": [[39.2880, -6.8160], [39.1670, -6.8850]],
@@ -307,44 +305,7 @@ with st.sidebar:
             use_container_width=True,
         )
 
-    # Historical Archive Compiler
-    with st.expander(":material/folder_zip: Full History Archive", expanded=False):
-        st.caption("Export all historical telemetry since Day 1.")
 
-        if "full_csv" not in st.session_state:
-            if st.button(
-                "Compile Database Archive",
-                icon=":material/archive:",
-                use_container_width=True,
-            ):
-                with st.spinner("Querying Firebase (This may take a moment)..."):
-                    docs = db.collection("traffic_history").stream()
-                    history_df = pd.DataFrame([doc.to_dict() for doc in docs])
-                    if not history_df.empty and "timestamp" in history_df.columns:
-                        history_df["timestamp_dt"] = pd.to_datetime(history_df["timestamp"], utc=True)
-                        history_df = history_df.sort_values("timestamp_dt", ascending=False).drop(columns=["timestamp_dt"])
-
-                    if not history_df.empty:
-                        st.session_state.full_csv = history_df.to_csv(
-                            index=False
-                        ).encode("utf-8")
-                        st.session_state.archive_date = datetime.now(tz).strftime(
-                            "%Y%m%d"
-                        )
-                        st.rerun()
-                    else:
-                        st.error("Database is empty.", icon=":material/error:")
-
-        if "full_csv" in st.session_state:
-            st.success("Archive Ready!", icon=":material/check_circle:")
-            st.download_button(
-                label="Download Archive.csv",
-                data=st.session_state.full_csv,
-                file_name=f"dar_traffic_full_archive_{st.session_state.archive_date}.csv",
-                mime="text/csv",
-                icon=":material/download:",
-                use_container_width=True,
-            )
 
     st.divider()
     st.caption("Architected by John Mziray")
@@ -502,7 +463,7 @@ if not df_raw.empty:
                 with st.spinner("Analyzing macro-level routing data..."):
                     try:
                         prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
-                        response = genai.GenerativeModel("gemini-2.5-flash").generate_content(prompt)
+                        response = genai.GenerativeModel("gemini-2.0-flash").generate_content(prompt)
                         st.markdown(f'<div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:12px;font-size:0.85rem;color:#C8D0E0;line-height:1.6;margin-top:10px;">{response.text}</div>', unsafe_allow_html=True)
                     except Exception as e:
                         st.error(f"AI Error: {e}")
@@ -526,7 +487,8 @@ if not df_raw.empty:
                 badge_text = ("SMOOTH" if d <= 4 else ("MODERATE" if d <= 10 else "HEAVY JAM"))
                 bar_color = ("#2ED573" if d <= 4 else ("#FFA502" if d <= 10 else "#FF4757"))
                 bar_pct = min(int(s / 50 * 100), 100)
-                w_icon = "🌧️" if "Rain" in str(row['weather']) else ("☁️" if "Cloud" in str(row['weather']) else "☀️")
+                weather_str_lower = str(row['weather']).lower()
+                w_icon = "🌧️" if "rain" in weather_str_lower or "storm" in weather_str_lower else ("☁️" if "cloud" in weather_str_lower or "overcast" in weather_str_lower else "☀️")
                 with cols[index]:
                     st.markdown(f"""
                     <div class="road-card {card_class}">
