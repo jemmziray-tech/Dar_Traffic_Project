@@ -68,7 +68,7 @@ def load_historical_data():
     docs = (
         db.collection("traffic_history")
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
-        .limit(40000)
+        .limit(5000)
         .stream()
     )
 
@@ -244,6 +244,19 @@ with tab2:
             plot_bgcolor="rgba(0,0,0,0)",
             font=dict(family="Inter", color="#8892A4"),
         )
+        
+        # --- NEW: K-MEANS HIGHLIGHT CARDS ---
+        try:
+            most_volatile = cluster_data.loc[cluster_data["Volatility"].idxmax()]
+            worst_gridlock = cluster_data.loc[cluster_data["Mean_Delay"].idxmax()]
+            
+            c1, c2 = st.columns(2)
+            c1.metric("Most Unpredictable Artery", most_volatile["name"], f"± {most_volatile['Volatility']:.1f} mins variance", delta_color="inverse")
+            c2.metric("Worst Chronic Gridlock", worst_gridlock["name"], f"{worst_gridlock['Mean_Delay']:.1f} mins avg delay", delta_color="inverse")
+            st.markdown("<br>", unsafe_allow_html=True)
+        except Exception:
+            pass
+
         st.plotly_chart(fig_cluster, use_container_width=True)
     else:
         st.info(
@@ -281,6 +294,14 @@ with tab3:
         cost_df["delay_mins"] * cost_per_minute * cars_per_hour * annual_multiplier
     )
     cost_df = cost_df.sort_values(by="Annual_Loss_TZS", ascending=True)
+
+    total_city_loss = cost_df["Annual_Loss_TZS"].sum()
+    st.markdown(f"""
+    <div style="background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.3);border-radius:10px;padding:20px;text-align:center;margin-bottom:20px;">
+        <div style="color:#FF4757;font-size:0.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Total Annual City Economic Bleed</div>
+        <div style="color:#FFFFFF;font-size:2.5rem;font-weight:800;letter-spacing:-1px;">TZS {total_city_loss:,.0f}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     fig_finance = px.bar(
         cost_df,
