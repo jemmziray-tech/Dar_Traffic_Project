@@ -137,7 +137,8 @@ if selected_road:
         with col_title:
             st.subheader(f"{format_road_name(selected_road)}")
         with col_download:
-            csv_data = hist_df.to_csv(index=False).encode('utf-8')
+            # Prepend UTF-8 BOM so Excel opens the file with correct character encoding (fixes Â°C glitch)
+            csv_data = "\ufeff".encode('utf8') + hist_df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="📥 Export CSV",
                 data=csv_data,
