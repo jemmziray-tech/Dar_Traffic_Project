@@ -1,7 +1,8 @@
 # <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6a6/512.gif" width="35" align="center"> Dar es Salaam Smart City: Traffic & Weather Engine
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/traffic_scraper.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=Scraper%20Status)
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/retrainai.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=AI%20Retraining)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/retrain_ai.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=AI%20Retraining)
+
 ![Firebase](https://img.shields.io/badge/Database-Firebase%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
 ![Google Gemini](https://img.shields.io/badge/GenAI-Google%20Gemini-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white)
 ![Python](https://img.shields.io/badge/Engine-Python%203.10-3776AB?style=for-the-badge&logo=python&logoColor=white)

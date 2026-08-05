@@ -355,14 +355,18 @@ with tab4:
                             if "road_id" in str(x)
                             else (
                                 "Weather Condition"
-                                if "Condition" in str(x)
+                                if any(k in str(x).lower() for k in ["condition", "rain", "precip", "temp", "weather"])
                                 else (
                                     "Day of Week"
-                                    if "Day" in str(x)
+                                    if any(k in str(x).lower() for k in ["day", "weekend"])
                                     else (
                                         "Time of Day (Hour)"
-                                        if "Hour" in str(x)
-                                        else "Other"
+                                        if any(k in str(x).lower() for k in ["hour", "rush"])
+                                        else (
+                                            "Traffic Momentum"
+                                            if "velocity" in str(x).lower()
+                                            else "Other"
+                                        )
                                     )
                                 )
                             )
@@ -400,7 +404,8 @@ with tab4:
                         icon=":material/warning:",
                     )
             except Exception as e:
-                st.error(f"Failed to unbox model: {e}", icon=":material/error:")
+                st.error("Model analysis unavailable. Check logs for details.", icon=":material/error:")
+        else:
             st.markdown("""
             <div style="background:rgba(255,165,2,0.06);border:1px solid rgba(255,165,2,0.2);
                         border-radius:12px;padding:20px 24px;margin-top:8px;">
@@ -410,11 +415,11 @@ with tab4:
                     <code style="background:rgba(255,255,255,0.07);padding:2px 6px;
                                  border-radius:4px;font-size:0.8rem;">traffic_model.pkl</code>
                     not found in the app directory.<br><br>
-                    The model will be retrained automatically by the GitHub Actions daily pipeline.
-                    Check back after the next scheduled run, or retrain manually by running
+                    The model retrains automatically every morning at 06:00 EAT via GitHub Actions.
+                    Check back after the next scheduled run, or run
                     <code style="background:rgba(255,255,255,0.07);padding:2px 6px;
                                  border-radius:4px;font-size:0.8rem;">python train_model.py</code>
-                    locally and pushing the result.
+                    locally and push the result.
                 </div>
             </div>
             """, unsafe_allow_html=True)

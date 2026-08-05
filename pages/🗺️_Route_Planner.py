@@ -123,58 +123,73 @@ def get_db():
 # 4. DAR ES SALAAM ROAD NETWORK GRAPH
 # Each entry: (road_id_in_firebase, display_name, base_travel_mins)
 # ─────────────────────────────────────────────────────────────────────────────
-# Canonical road IDs must match what's stored in Firebase live_traffic
+# Canonical road IDs — must EXACTLY match document IDs in Firestore live_traffic collection
+# (these come from the 'id' field in scrape_traffic.py ROADS list)
 ROAD_IDS = {
-    "morogoro_rd_kimara":       "Morogoro Rd (Kimara–Ubungo)",
-    "morogoro_rd_ubungo":       "Morogoro Rd (Ubungo–Posta)",
-    "bagamoyo_rd_tegeta":       "Bagamoyo Rd (Tegeta–Mwenge)",
-    "bagamoyo_rd_mwenge":       "Bagamoyo Rd (Mwenge–Posta)",
-    "kilwa_rd_mbagala":         "Kilwa Rd (Mbagala)",
-    "nyerere_rd_tazara":        "Nyerere Rd (TAZARA)",
-    "mandela_rd_port":          "Mandela Rd (Port Link)",
-    "kawawa_rd_morocco":        "Kawawa Rd (Morocco–Kinondoni)",
-    "sam_nujoma_rd":            "Sam Nujoma Rd",
-    "goba_rd":                  "Goba Road (Massana–Goba Center)",
-    "posta_to_gongolamboto":    "Posta–Gongo la Mboto",
-    "posta_to_tegeta":          "Mega-Route: Posta–Tegeta (Bagamoyo Rd)",
-    "posta_to_kimara":          "Mega-Route: Posta–Kimara (Morogoro Rd)",
-    "changombe_road":           "Changombe Road",
+    "ubungo":               "Morogoro Rd (Ubungo)",
+    "posta_to_kimara":      "Mega-Route: Posta–Kimara (Morogoro Rd)",
+    "mwenge":               "Bagamoyo Rd (Mwenge)",
+    "old_bagamoyo":         "Old Bagamoyo Rd (Victoria)",
+    "posta_to_tegeta":      "Mega-Route: Posta–Tegeta (Bagamoyo Rd)",
+    "kilwa_mbagala":        "Kilwa Rd (Mbagala)",
+    "tazara":               "Nyerere Rd (TAZARA)",
+    "mandela_buguruni":     "Mandela Rd (Port Link)",
+    "morocco_intersection": "Kawawa Rd (Morocco–Kinondoni)",
+    "sam_nujoma":           "Sam Nujoma Rd",
+    "goba_massana":         "Goba Road (Massana–Goba Center)",
+    "posta_to_gongolamboto":"Mega-Route: Posta–Gongo la Mboto",
+    "changombe_road":       "Chang'ombe Road (Temeke)",
+    "kigogo_roundabout":    "Kawawa Rd (Kigogo Choke)",
+    "tabata_dampo":         "Tabata Road (Mandela–Segerea)",
+    "selander":             "Ali Hassan Mwinyi Rd",
+    "sinza_mori":           "Sinza Road",
+    "mwai_kibaki":          "Mwai Kibaki Rd (Kawe–Mikocheni)",
+    "fire_upanga":          "UN Road (Fire–Upanga)",
+    "kamata_gerezani":      "Kamata / Gerezani (Port Entry)",
+    "uhuru_street":         "Uhuru Street (Ilala–Town)",
 }
 
-# ROUTE NETWORK: each origin→destination has 1-2 possible routes
-# Each route = list of road_ids to traverse in order
+# ROUTE NETWORK — each route lists real Firestore document IDs in traverse order
 ROUTES = {
     ("Kimara", "Posta / CBD"): {
-        "Route 1 — Morogoro Rd Direct": ["posta_to_kimara", "morogoro_rd_ubungo"],
-        "Route 2 — Via Sam Nujoma": ["sam_nujoma_rd", "kawawa_rd_morocco", "nyerere_rd_tazara"],
+        "Route 1 — Morogoro Rd Direct": ["posta_to_kimara", "ubungo"],
+        "Route 2 — Via Sam Nujoma": ["sam_nujoma", "morocco_intersection", "tazara"],
     },
     ("Tegeta", "Posta / CBD"): {
-        "Route 1 — Bagamoyo Rd Direct": ["posta_to_tegeta", "bagamoyo_rd_mwenge"],
-        "Route 2 — Via Mwenge + Sam Nujoma": ["bagamoyo_rd_tegeta", "bagamoyo_rd_mwenge", "sam_nujoma_rd"],
+        "Route 1 — Bagamoyo Rd Direct": ["posta_to_tegeta", "mwenge"],
+        "Route 2 — Via Mwenge + Sam Nujoma": ["old_bagamoyo", "mwenge", "sam_nujoma"],
     },
     ("Mbagala", "Posta / CBD"): {
-        "Route 1 — Kilwa Rd": ["kilwa_rd_mbagala", "changombe_road"],
-        "Route 2 — Mandela + Nyerere": ["mandela_rd_port", "nyerere_rd_tazara"],
+        "Route 1 — Kilwa Rd": ["kilwa_mbagala", "changombe_road"],
+        "Route 2 — Mandela + Nyerere": ["mandela_buguruni", "tazara"],
     },
     ("Goba", "Posta / CBD"): {
-        "Route 1 — Goba Rd + Kawawa": ["goba_rd", "kawawa_rd_morocco", "sam_nujoma_rd"],
-        "Route 2 — Via Mwenge": ["goba_rd", "bagamoyo_rd_mwenge"],
+        "Route 1 — Goba Rd + Kawawa": ["goba_massana", "morocco_intersection", "sam_nujoma"],
+        "Route 2 — Via Mwenge": ["goba_massana", "mwenge"],
     },
     ("Morocco / Kinondoni", "Posta / CBD"): {
-        "Route 1 — Kawawa Rd Direct": ["kawawa_rd_morocco", "sam_nujoma_rd"],
-        "Route 2 — Bagamoyo to Mwenge": ["bagamoyo_rd_mwenge"],
+        "Route 1 — Kawawa Rd Direct": ["morocco_intersection", "sam_nujoma"],
+        "Route 2 — Via Bagamoyo Rd": ["mwenge", "selander"],
     },
     ("Port / Bandarini", "Posta / CBD"): {
-        "Route 1 — Mandela Rd": ["mandela_rd_port"],
-        "Route 2 — Via Nyerere Rd": ["nyerere_rd_tazara"],
+        "Route 1 — Mandela Rd": ["mandela_buguruni", "kamata_gerezani"],
+        "Route 2 — Via Nyerere Rd": ["tazara", "uhuru_street"],
     },
     ("TAZARA / Kigamboni", "Posta / CBD"): {
-        "Route 1 — Nyerere Rd Direct": ["nyerere_rd_tazara", "changombe_road"],
-        "Route 2 — Via Mandela": ["mandela_rd_port", "nyerere_rd_tazara"],
+        "Route 1 — Nyerere Rd Direct": ["tazara", "changombe_road"],
+        "Route 2 — Via Mandela": ["mandela_buguruni", "tazara"],
     },
     ("Gongo la Mboto", "Posta / CBD"): {
-        "Route 1 — Direct Corridor": ["posta_to_gongolamboto", "nyerere_rd_tazara"],
-        "Route 2 — Via Sam Nujoma": ["sam_nujoma_rd", "nyerere_rd_tazara"],
+        "Route 1 — Direct Corridor": ["posta_to_gongolamboto", "tazara"],
+        "Route 2 — Via Tabata": ["tabata_dampo", "tazara"],
+    },
+    ("Sinza / Kinondoni", "Posta / CBD"): {
+        "Route 1 — Sinza + Sam Nujoma": ["sinza_mori", "sam_nujoma"],
+        "Route 2 — Via Kawawa": ["sinza_mori", "kigogo_roundabout", "uhuru_street"],
+    },
+    ("Kawe / Mikocheni", "Posta / CBD"): {
+        "Route 1 — Mwai Kibaki + Old Bagamoyo": ["mwai_kibaki", "old_bagamoyo", "selander"],
+        "Route 2 — Via Mwenge": ["mwai_kibaki", "mwenge", "sam_nujoma"],
     },
 }
 

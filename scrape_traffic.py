@@ -323,14 +323,13 @@ def apply_traffic_congestion_model(road, base_live_mins, weather_str, precip_mm)
     if precip_mm > 0.1 or "Rain" in str(weather_str):
         congestion_factor *= (1.3 + min(precip_mm * 0.05, 0.6))
 
-    # Natural sensor jitter (+/- 8%)
-    jitter = float(np.random.uniform(0.92, 1.08))
-    
-    live_m = max(norm_m, int(round(base_live_mins * congestion_factor * jitter)))
+
+    live_m = max(norm_m, int(round(base_live_mins * congestion_factor)))
     delay_m = max(0, live_m - norm_m)
     speed = round(dist_km / (live_m / 60.0), 1) if live_m > 0 else 0.0
-    
+
     return norm_m, live_m, delay_m, speed
+
 
 
 def update_smart_city(road, weather_info):

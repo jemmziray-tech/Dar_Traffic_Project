@@ -384,8 +384,8 @@ with col_chat:
                     """
 
                     try:
-                        # Powered by Gemini 2.5 Flash
-                        model = genai.GenerativeModel("gemini-3.5-flash")
+                        # Powered by Gemini 2.0 Flash
+                        model = genai.GenerativeModel("gemini-2.0-flash")
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
                         response = model.generate_content(full_prompt)
 

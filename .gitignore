@@ -2,3 +2,8 @@
 firebase-key.json
 __pycache__/
 .pytest_cache/
+.venv/
+*.egg-info/
+.streamlit/secrets.toml
+dar_traffic_live.csv
+historical_traffic.csv
