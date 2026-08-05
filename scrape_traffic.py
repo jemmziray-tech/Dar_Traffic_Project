@@ -258,9 +258,10 @@ def get_weather_for_all_roads(roads: list) -> dict:
         temp   = current.get("temperature_2m", 28.0)
         code   = current.get("weather_code", 0)
         precip = float(current.get("precipitation", 0.0))
-        if code >= 51 or precip > 0.1:
+        # 61+ is actual Rain/Showers/Storms. 51-55 is just microscopic drizzle.
+        if code >= 61 or precip >= 0.5:
             condition = "Rainy"
-        elif code >= 4:
+        elif code >= 4 or (50 <= code <= 55): # Treat light drizzle as cloudy
             condition = "Cloudy"
         else:
             condition = "Clear"
