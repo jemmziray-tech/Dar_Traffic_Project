@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 # Load Environment Variables securely
 load_dotenv()
+from config import ROAD_COORDS, ROAD_PATHS
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -182,53 +183,7 @@ def init_system():
 db = init_system()
 
 # --- 3. MASTER CITY GRID COORDINATES & PATHS ---
-ROAD_COORDS = {
-    "ubungo": {"lat": -6.8009, "lon": 39.2250},
-    "mwenge": {"lat": -6.7687, "lon": 39.2460},
-    "selander": {"lat": -6.8000, "lon": 39.2800},
-    "tazara": {"lat": -6.8344, "lon": 39.2540},
-    "mandela_buguruni": {"lat": -6.8310, "lon": 39.2527},
-    "kilwa_mbagala": {"lat": -6.8900, "lon": 39.2750},
-    "old_bagamoyo": {"lat": -6.7770, "lon": 39.2600},
-    "sam_nujoma": {"lat": -6.7865, "lon": 39.2320},
-    "uhuru_street": {"lat": -6.8187, "lon": 39.2685},
-    "posta_to_tegeta": {"lat": -6.7295, "lon": 39.2215},
-    "posta_to_kimara": {"lat": -6.7980, "lon": 39.2190},
-    "posta_to_gongolamboto": {"lat": -6.8505, "lon": 39.2275},
-    "tabata_dampo": {"lat": -6.8225, "lon": 39.2185},
-    "kamata_gerezani": {"lat": -6.8230, "lon": 39.2815},
-    "changombe_road": {"lat": -6.8450, "lon": 39.2675},
-    "morocco_intersection": {"lat": -6.7885, "lon": 39.2605},
-    "kigogo_roundabout": {"lat": -6.8170, "lon": 39.2525},
-    "fire_upanga": {"lat": -6.8070, "lon": 39.2750},
-    "mwai_kibaki": {"lat": -6.7550, "lon": 39.2425},
-    "sinza_mori": {"lat": -6.7740, "lon": 39.2400},
-    "goba_massana": {"lat": -6.7200, "lon": 39.2000},
-}
-
-ROAD_PATHS = {
-    "ubungo": [[39.2201, -6.7978], [39.2300, -6.8040]],
-    "mwenge": [[39.2431, -6.7744], [39.2489, -6.7631]],
-    "selander": [[39.2750, -6.7950], [39.2850, -6.8050]],
-    "tazara": [[39.2600, -6.8288], [39.2480, -6.8400]],
-    "mandela_buguruni": [[39.2435, -6.8285], [39.2620, -6.8335]],
-    "kilwa_mbagala": [[39.2700, -6.9050], [39.2800, -6.8750]],
-    "old_bagamoyo": [[39.2550, -6.7720], [39.2650, -6.7820]],
-    "sam_nujoma": [[39.2435, -6.7755], [39.2205, -6.7975]],
-    "uhuru_street": [[39.2550, -6.8220], [39.2820, -6.8155]],
-    "posta_to_tegeta": [[39.2880, -6.8160], [39.1550, -6.6430]],
-    "posta_to_kimara": [[39.2880, -6.8160], [39.1500, -6.7800]],
-    "posta_to_gongolamboto": [[39.2880, -6.8160], [39.1670, -6.8850]],
-    "tabata_dampo": [[39.2320, -6.8150], [39.2050, -6.8300]],
-    "kamata_gerezani": [[39.2780, -6.8280], [39.2850, -6.8180]],
-    "changombe_road": [[39.2700, -6.8350], [39.2650, -6.8550]],
-    "morocco_intersection": [[39.2630, -6.7820], [39.2580, -6.7950]],
-    "kigogo_roundabout": [[39.2550, -6.8120], [39.2500, -6.8220]],
-    "fire_upanga": [[39.2780, -6.8120], [39.2720, -6.8020]],
-    "mwai_kibaki": [[39.2350, -6.7450], [39.2500, -6.7650]],
-    "sinza_mori": [[39.2350, -6.7780], [39.2450, -6.7700]],
-    "goba_massana": [[39.2150, -6.7250], [39.1850, -6.7150]]
-}
+# (Imported dynamically from config.py to ensure zero redundancy)
 
 
 # --- 4. Helper Functions ---

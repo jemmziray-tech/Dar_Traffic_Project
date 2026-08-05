@@ -82,32 +82,13 @@ genai_active = init_genai()
 tz = pytz.timezone("Africa/Dar_es_Salaam")
 
 # --- 3. MASTER ROAD DICTIONARY ---
-ROAD_MAP = {
-    "ubungo": "Morogoro Rd (Ubungo)",
-    "mwenge": "Bagamoyo Rd (Mwenge)",
-    "selander": "Ali Hassan Mwinyi",
-    "tazara": "Nyerere Rd (Tazara)",
-    "mandela_buguruni": "Mandela Rd (Port Link)",
-    "kilwa_mbagala": "Kilwa Rd (Mbagala)",
-    "old_bagamoyo": "Old Bagamoyo Rd (Victoria)",
-    "sam_nujoma": "Sam Nujoma Rd (Mwenge-Ubungo)",
-    "uhuru_street": "Uhuru Street (Ilala)",
-    "posta_to_tegeta": "Mega-Route: Posta to Tegeta",
-    "posta_to_kimara": "Mega-Route: Posta to Kimara",
-    "posta_to_gongolamboto": "Mega-Route: Posta to Airport",
-    "tabata_dampo": "Tabata Road (Mandela to Segerea)",
-    "kamata_gerezani": "Kamata (Port Entry)",
-    "changombe_road": "Chang'ombe Road (Temeke)",
-    "morocco_intersection": "Kawawa Rd (Morocco to Kinondoni)",
-    "kigogo_roundabout": "Kawawa Rd (Kigogo Choke)",
-    "fire_upanga": "UN Road (Fire to Upanga)",
-    "mwai_kibaki": "Mwai Kibaki Rd (Kawe)",
-    "sinza_mori": "Sinza Road (Mori to Bamaga)",
-    "goba_massana": "Goba Road (Massana)",
-}
-REVERSE_ROAD_MAP = {v: k for k, v in ROAD_MAP.items()}
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from config import ROAD_MAP, REVERSE_ROAD_MAP, ROUTES
 
 DAYS_MAP = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4, "Saturday": 5, "Sunday": 6}
+ORIGINS = sorted(list(set(o for o, _ in ROUTES.keys())))
 
 
 def build_features_df(road_ids, target_day, hour_fraction, target_weather):
@@ -138,9 +119,9 @@ def build_features_df(road_ids, target_day, hour_fraction, target_weather):
 
 
 # --- 4. HEADER UI ---
-st.title(":material/explore: AI Commute Predictor & Copilot")
+st.title(":material/explore: AI Commute Predictor & Mshauri")
 st.caption(
-    "Plan your journey using our XGBoost prediction engine and consult the Gemini AI Copilot for logistics advice."
+    "Plan your journey using our XGBoost prediction engine and consult Mshauri (AI Copilot) for logistics advice."
 )
 st.divider()
 
@@ -155,41 +136,35 @@ with col_ml:
 
     # Input Form
     with st.container(border=True):
-        r1, r2 = st.columns(2)
-        target_road_name = r1.selectbox(
-            "Target Route", list(ROAD_MAP.values()), index=1
-        )
-        target_road_id = REVERSE_ROAD_MAP[target_road_name]
+        r1, r2, r3 = st.columns([1.5, 1.5, 2])
+        origin = r1.selectbox("Origin", ORIGINS, key="ai_origin")
+        valid_destinations = sorted(list(set(d for o, d in ROUTES.keys() if o == origin)))
+        destination = r2.selectbox("Destination", valid_destinations, key="ai_dest")
+        
+        route_options = ROUTES.get((origin, destination), {})
+        route_names = list(route_options.keys())
+        target_route_name = r3.selectbox("Route Option", route_names, key="ai_route")
+        
+        # Get the segments for the selected route
+        target_road_ids = route_options[target_route_name]
 
-        target_day = r2.selectbox(
+        r_day, r_time, r_weather = st.columns(3)
+        target_day = r_day.selectbox(
             "Day of Week",
-            [
-                "Monday",
-                "Tuesday",
-                "Wednesday",
-                "Thursday",
-                "Friday",
-                "Saturday",
-                "Sunday",
-            ],
+            ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
             index=datetime.now(tz).weekday(),
         )
 
-        r3, r4 = st.columns(2)
-        time_options = [
-            f"{h:02d}:{m:02d}" for h in range(6, 24) for m in (0, 15, 30, 45)
-        ]
+        time_options = [f"{h:02d}:{m:02d}" for h in range(6, 24) for m in (0, 15, 30, 45)]
         current_hour = datetime.now(tz).hour
         default_time = f"{current_hour:02d}:00" if 6 <= current_hour <= 23 else "08:00"
-        target_time_str = r3.selectbox(
+        target_time_str = r_time.selectbox(
             "Departure Time",
             time_options,
-            index=(
-                time_options.index(default_time) if default_time in time_options else 8
-            ),
+            index=(time_options.index(default_time) if default_time in time_options else 8),
         )
 
-        target_weather = r4.selectbox("Expected Weather", ["Clear", "Cloudy", "Rainy"])
+        target_weather = r_weather.selectbox("Expected Weather", ["Clear", "Cloudy", "Rainy"])
 
     st.write("")
 
@@ -198,19 +173,20 @@ with col_ml:
         h, m = map(int, target_time_str.split(":"))
         target_fraction = h + (m / 60.0)  # Converts 08:30 to 8.5
 
-        pred_df = build_features_df(target_road_id, target_day, target_fraction, target_weather)
-        exact_prediction = float(rf_model.predict(pred_df)[0])
-        exact_prediction = max(0.0, round(exact_prediction, 1))
+        # Predict delays for ALL segments in the selected route
+        pred_df = build_features_df(target_road_ids, target_day, target_fraction, target_weather)
+        segment_predictions = [max(0.0, float(val)) for val in rf_model.predict(pred_df)]
+        exact_prediction = round(sum(segment_predictions), 1)
 
         pred_color = (
             "normal"
-            if exact_prediction <= 5
-            else ("off" if exact_prediction <= 10 else "inverse")
+            if exact_prediction <= 10
+            else ("off" if exact_prediction <= 25 else "inverse")
         )
         status_text = (
             "Smooth Flow"
-            if exact_prediction <= 5
-            else ("Moderate Congestion" if exact_prediction <= 10 else "Heavy Gridlock")
+            if exact_prediction <= 10
+            else ("Moderate Congestion" if exact_prediction <= 25 else "Heavy Gridlock")
         )
 
         # B. Dynamic Confidence Score
@@ -228,7 +204,7 @@ with col_ml:
         st.subheader(":material/flag: Predicted Outcome")
         m1, m2 = st.columns(2)
         m1.metric(
-            "Estimated Delay",
+            "Estimated Extra Delay",
             f"{exact_prediction:.1f} Mins",
             delta=status_text,
             delta_color=pred_color,
@@ -240,32 +216,35 @@ with col_ml:
             delta_color="normal",
         )
 
-        # D. Time-Shift Curve Generation
+        # D. Time-Shift Curve Generation (Predicting the entire route over time)
         start_frac = max(6.0, target_fraction - 1.5)
         end_frac = min(23.75, target_fraction + 1.5)
-        curve_hours = [
-            start_frac + (i * 0.25)
-            for i in range(int((end_frac - start_frac) / 0.25) + 1)
-        ]
+        curve_hours = [start_frac + (i * 0.25) for i in range(int((end_frac - start_frac) / 0.25) + 1)]
 
         curve_rows = []
         for h_frac in curve_hours:
-            f_row = build_features_df(target_road_id, target_day, h_frac, target_weather)
+            f_row = build_features_df(target_road_ids, target_day, h_frac, target_weather)
             f_row["Hour"] = h_frac
             curve_rows.append(f_row)
+        
         curve_df = pd.concat(curve_rows, ignore_index=True)
-        curve_df["Predicted_Delay"] = [max(0.0, float(val)) for val in rf_model.predict(curve_df.drop(columns=["Hour"]))]
+        # Predict all segments for all time slices at once
+        predictions = rf_model.predict(curve_df.drop(columns=["Hour"]))
+        curve_df["Predicted_Delay"] = [max(0.0, float(val)) for val in predictions]
+        
+        # Group by hour and sum the delays across all segments for that hour
+        route_curve = curve_df.groupby("Hour")["Predicted_Delay"].sum().reset_index()
 
         def format_frac(f):
             hr, mn = int(f), int(round((f - int(f)) * 60))
             return f"{hr:02d}:{mn:02d}"
 
-        curve_df["Time_Label"] = curve_df["Hour"].apply(format_frac)
+        route_curve["Time_Label"] = route_curve["Hour"].apply(format_frac)
 
         # E. Beautiful Plotly Area Chart (Mathematically Safe)
         st.markdown("**Departure Window Analysis**")
         fig = px.area(
-            curve_df,
+            route_curve,
             x="Hour",
             y="Predicted_Delay",
             hover_data={"Time_Label": True, "Hour": False},
@@ -286,12 +265,12 @@ with col_ml:
         fig.update_layout(
             margin=dict(l=0, r=0, t=10, b=0),
             xaxis_title="",
-            yaxis_title="Minutes Delayed",
+            yaxis_title="Total Mins Delayed",
             xaxis=dict(
                 showgrid=False,
                 tickmode="array",
-                tickvals=curve_df["Hour"].tolist(),
-                ticktext=curve_df["Time_Label"].tolist(),
+                tickvals=route_curve["Hour"].tolist(),
+                ticktext=route_curve["Time_Label"].tolist(),
             ),
             yaxis=dict(showgrid=True, gridcolor="#333333"),
         )
@@ -305,16 +284,16 @@ with col_ml:
 
 
 # =========================================================
-# RIGHT COLUMN (40%): DARTRAFFIC COPILOT (GEMINI 2.5)
+# RIGHT COLUMN (40%): DARTRAFFIC COPILOT (MSHAURI)
 # =========================================================
 with col_chat:
-    st.subheader(":material/robot_2: DarTraffic Copilot")
+    st.subheader(":material/robot_2: Mshauri")
     st.caption("Ask our AI about alternatives, wait times, or strategy.")
 
     with st.container(border=True, height=530):
         if not genai_active:
             st.info(
-                "Configure GEMINI_API_KEY in environment to activate Copilot.",
+                "Configure GEMINI_API_KEY in environment to activate Mshauri.",
                 icon=":material/key:",
             )
         else:
@@ -323,7 +302,7 @@ with col_chat:
                 st.session_state.messages = [
                     {
                         "role": "assistant",
-                        "content": "Hello! I am your AI Logistics Assistant. Ask me if you should reroute or delay your departure.",
+                        "content": "Habari! I am Mshauri, your AI Logistics Advisor. Ask me if you should reroute or delay your departure.",
                     }
                 ]
 
@@ -343,44 +322,46 @@ with col_chat:
 
                     context_injection = ""
                     if rf_model:
-                        # 1. SPATIAL MATRIX: All roads at the exact selected time
-                        all_roads = list(REVERSE_ROAD_MAP.values())
-                        city_df = build_features_df(all_roads, target_day, target_fraction, target_weather)
-                        city_df["Predicted_Delay"] = [max(0.0, float(val)) for val in rf_model.predict(city_df)]
+                        # 1. SPATIAL MATRIX: Calculate total delay for all alternative routes
+                        alt_routes_status = ""
+                        for r_name, r_segments in route_options.items():
+                            if r_name != target_route_name:
+                                alt_df = build_features_df(r_segments, target_day, target_fraction, target_weather)
+                                alt_preds = [max(0.0, float(val)) for val in rf_model.predict(alt_df)]
+                                alt_total = sum(alt_preds)
+                                alt_routes_status += f"- {r_name}: {alt_total:.1f} mins extra delay\n"
+                        
+                        if not alt_routes_status:
+                            alt_routes_status = "No alternative routes configured for this Origin-Destination pair.\n"
 
-                        city_status = ""
-                        for idx, row in city_df.iterrows():
-                            friendly_name = ROAD_MAP[row["road_id"]]
-                            city_status += f"- {friendly_name}: {row['Predicted_Delay']:.1f} mins\n"
-
-                        # 2. TEMPORAL MATRIX: The user's target road over a 3-hour window
+                        # 2. TEMPORAL MATRIX: The user's target route over a 3-hour window
                         time_trend = ""
-                        if "curve_df" in locals():
-                            for _, row in curve_df.iterrows():
-                                time_trend += f"- {row['Time_Label']}: {row['Predicted_Delay']:.1f} mins\n"
+                        if "route_curve" in locals():
+                            for _, row in route_curve.iterrows():
+                                time_trend += f"- {row['Time_Label']}: {row['Predicted_Delay']:.1f} mins extra delay\n"
 
                         # 3. Injecting the Brain
                         context_injection = f"""
                         [SYSTEM DATA FEED]
-                        The user is evaluating a departure on {target_day} at {target_time_str} under {target_weather} conditions.
-                        Their Primary Route: '{target_road_name}' (Predicted Delay: {exact_prediction:.1f} mins).
+                        The user is evaluating a departure from {origin} to {destination} on {target_day} at {target_time_str} under {target_weather} conditions.
+                        Their Selected Route: '{target_route_name}' (Predicted Extra Delay: {exact_prediction:.1f} mins).
 
-                        1. CITY-WIDE ALTERNATIVES (At exactly {target_time_str}):
-                        {city_status}
+                        1. ALTERNATIVE ROUTES (At exactly {target_time_str}):
+                        {alt_routes_status}
 
-                        2. TIME-SHIFT PREDICTIONS FOR PRIMARY ROUTE ('{target_road_name}'):
+                        2. TIME-SHIFT PREDICTIONS FOR SELECTED ROUTE ('{target_route_name}'):
                         {time_trend}
                         """
 
                     system_prompt = f"""
-                    You are 'DarTraffic Copilot', an elite, data-driven logistics AI.
+                    You are 'Mshauri', an elite, data-driven logistics AI advisor for Dar es Salaam.
                     {context_injection}
                     
                     [STRICT DIRECTIVES]
                     1. NEVER claim you cannot predict the future. You have the exact predictive time-shift data in the feed above.
-                    2. If the user asks about shifting to another road, use the CITY-WIDE ALTERNATIVES feed to compare delays mathematically.
+                    2. If the user asks about shifting to another route, use the ALTERNATIVE ROUTES feed to compare delays mathematically.
                     3. If the user asks if they should "wait" or "leave later", use the TIME-SHIFT PREDICTIONS feed. Tell them exactly what the delay will be at the specific times in the feed.
-                    4. Keep your answer concise, corporate, and highly analytical. Maximum 3 to 4 sentences.
+                    4. Keep your answer concise, highly analytical, and friendly. Maximum 3 to 4 sentences.
                     """
 
                     try:
@@ -395,4 +376,3 @@ with col_chat:
                         )
                     except Exception as e:
                         message_placeholder.error(f"Connection Error: {e}")
-

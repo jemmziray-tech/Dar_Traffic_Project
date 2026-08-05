@@ -26,29 +26,7 @@ from xgboost import XGBRegressor
 print("🚀 Booting Advanced Enterprise AI Training Pipeline (V3 XGBoost + Velocity)...")
 
 # --- 1. Define Target Roads ---
-TARGET_ROADS = [
-    "ubungo",
-    "mwenge",
-    "selander",
-    "tazara",
-    "mandela_buguruni",
-    "kilwa_mbagala",
-    "old_bagamoyo",
-    "sam_nujoma",
-    "uhuru_street",
-    "posta_to_tegeta",
-    "posta_to_kimara",
-    "posta_to_gongolamboto",
-    "tabata_dampo",
-    "kamata_gerezani",
-    "changombe_road",
-    "morocco_intersection",
-    "kigogo_roundabout",
-    "fire_upanga",
-    "mwai_kibaki",
-    "sinza_mori",
-    "goba_massana",
-]
+from config import TARGET_ROADS
 
 # --- 2. Connect to Firebase & Fetch Data ---
 print("📥 Fetching historical telemetry from Firebase...")
@@ -97,38 +75,8 @@ except Exception as err:
 df = pd.DataFrame([doc.to_dict() for doc in docs]) if docs else pd.DataFrame()
 
 if df.empty or len(df) < 10:
-    print("ℹ️ Limited historical rows in database. Generating synthetic bootstrap telemetry for training...")
-    synthetic_rows = []
-    base_time = datetime.now() - timedelta(days=30)
-    
-    np.random.seed(42)
-    for road in TARGET_ROADS:
-        for i in range(120): # 120 samples per road
-            dt = base_time + timedelta(hours=i * 6)
-            hr = dt.hour
-            is_rush = 1 if hr in [7, 8, 16, 17, 18, 19] else 0
-            is_rain = np.random.choice([0, 1], p=[0.8, 0.2])
-            
-            # Simulated realistic delay based on rush hour and rain
-            base_delay = np.random.uniform(1.0, 5.0)
-            if is_rush:
-                base_delay += np.random.uniform(5.0, 20.0)
-            if is_rain:
-                base_delay += np.random.uniform(3.0, 12.0)
-                
-            weather_str = f"28°C, {'Rainy' if is_rain else 'Clear'}"
-            synthetic_rows.append({
-                "road_id": road,
-                "name": road.replace("_", " ").title(),
-                "delay_mins": round(base_delay, 1),
-                "live_mins": int(round(base_delay + 10)),
-                "normal_mins": 10,
-                "speed_kmh": round(max(5.0, 40.0 - base_delay), 1),
-                "status": "Heavy Jam" if base_delay > 10 else "Moderate" if base_delay > 4 else "Smooth",
-                "weather": weather_str,
-                "timestamp": dt.isoformat()
-            })
-    df = pd.DataFrame(synthetic_rows)
+    print("ℹ️ Limited historical rows in database. Waiting for more data...")
+    sys.exit(0)
 
 # Filter the data to ONLY include our target roads
 df = df[df["road_id"].isin(TARGET_ROADS)]
