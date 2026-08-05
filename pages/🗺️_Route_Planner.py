@@ -191,10 +191,35 @@ ROUTES = {
         "Route 1 — Mwai Kibaki + Old Bagamoyo": ["mwai_kibaki", "old_bagamoyo", "selander"],
         "Route 2 — Via Mwenge": ["mwai_kibaki", "mwenge", "sam_nujoma"],
     },
+    
+    # === NEW: CROSS-CITY ROUTES ===
+    ("Ubungo", "Mwenge / Makumbusho"): {
+        "Route 1 — Sam Nujoma Direct": ["sam_nujoma"],
+        "Route 2 — Via Sinza": ["sinza_mori", "mwenge"],
+    },
+    ("Tegeta", "Ubungo"): {
+        "Route 1 — Bagamoyo Rd + Sam Nujoma": ["posta_to_tegeta", "mwenge", "sam_nujoma"],
+        "Route 2 — Via Goba": ["goba_massana", "sam_nujoma"],
+    },
+    ("Posta / CBD", "Airport (JNIA)"): {
+        "Route 1 — Nyerere Rd Direct": ["tazara", "posta_to_gongolamboto"],
+        "Route 2 — Via Uhuru St & Mandela": ["uhuru_street", "mandela_buguruni", "tazara"],
+    },
+    ("Mwenge / Makumbusho", "Airport (JNIA)"): {
+        "Route 1 — Sam Nujoma + Mandela": ["sam_nujoma", "mandela_buguruni", "tazara"],
+        "Route 2 — Via Kawawa & Nyerere": ["morocco_intersection", "kigogo_roundabout", "tazara"],
+    },
+    ("Tabata", "Posta / CBD"): {
+        "Route 1 — Uhuru St": ["tabata_dampo", "uhuru_street"],
+        "Route 2 — Via Mandela & Nyerere": ["tabata_dampo", "mandela_buguruni", "tazara"],
+    },
+    ("Tabata", "Mwenge / Makumbusho"): {
+        "Route 1 — Mandela + Sam Nujoma": ["tabata_dampo", "mandela_buguruni", "sam_nujoma"],
+        "Route 2 — Via Kigogo & Kawawa": ["tabata_dampo", "kigogo_roundabout", "morocco_intersection"],
+    }
 }
 
-ORIGINS = sorted(set(o for o, _ in ROUTES.keys()))
-DESTINATIONS = ["Posta / CBD"]  # Expandable later
+ORIGINS = sorted(list(set(o for o, _ in ROUTES.keys())))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. FETCH LIVE DELAYS FROM FIREBASE
@@ -247,9 +272,11 @@ sel_col, _, dest_col = st.columns([2, 0.2, 2])
 with sel_col:
     st.markdown('<div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px;">🟢 Starting From</div>', unsafe_allow_html=True)
     origin = st.selectbox("Origin", ORIGINS, label_visibility="collapsed", key="origin_sel")
+
 with dest_col:
-    st.markdown('<div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px;">📍 Destination</div>', unsafe_allow_html=True)
-    destination = st.selectbox("Destination", DESTINATIONS, label_visibility="collapsed", key="dest_sel")
+    valid_destinations = sorted(list(set(d for o, d in ROUTES.keys() if o == origin)))
+    st.markdown('<div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px;">🏁 Going To</div>', unsafe_allow_html=True)
+    destination = st.selectbox("Destination", valid_destinations, label_visibility="collapsed", key="dest_sel")
 
 st.write("")
 plan_btn = st.button("⚡ Plan My Route", type="primary", use_container_width=False)
