@@ -216,6 +216,50 @@ ROUTES = {
     ("Tabata", "Mwenge / Makumbusho"): {
         "Route 1 — Mandela + Sam Nujoma": ["tabata_dampo", "mandela_buguruni", "sam_nujoma"],
         "Route 2 — Via Kigogo & Kawawa": ["tabata_dampo", "kigogo_roundabout", "morocco_intersection"],
+    },
+    
+    # === NEW: LOGISTICS CORRIDORS ===
+    ("Port / Bandarini", "Ubungo"): {
+        "Route 1 — Mandela Rd": ["kamata_gerezani", "mandela_buguruni", "ubungo"],
+    },
+    ("Port / Bandarini", "Tegeta"): {
+        "Route 1 — Via Mandela & Sam Nujoma": ["kamata_gerezani", "mandela_buguruni", "sam_nujoma", "mwenge", "posta_to_tegeta"],
+        "Route 2 — Via Selander Bridge": ["kamata_gerezani", "selander", "old_bagamoyo", "posta_to_tegeta"],
+    },
+    ("Mbagala", "Airport (JNIA)"): {
+        "Route 1 — Via Chang'ombe": ["kilwa_mbagala", "changombe_road", "tazara", "posta_to_gongolamboto"],
+        "Route 2 — Via Mandela": ["kilwa_mbagala", "mandela_buguruni", "tazara", "posta_to_gongolamboto"],
+    },
+    
+    # === NEW: SUBURB TO SUBURB ===
+    ("Kimara", "Mwenge / Makumbusho"): {
+        "Route 1 — Sam Nujoma Traverse": ["posta_to_kimara", "sam_nujoma", "mwenge"],
+        "Route 2 — Via Sinza": ["posta_to_kimara", "sinza_mori", "mwenge"],
+    },
+    ("Gongo la Mboto", "Ubungo"): {
+        "Route 1 — Nyerere & Mandela": ["posta_to_gongolamboto", "mandela_buguruni", "ubungo"],
+    },
+    ("Mbagala", "Mwenge / Makumbusho"): {
+        "Route 1 — Mandela to Sam Nujoma": ["kilwa_mbagala", "mandela_buguruni", "sam_nujoma", "mwenge"],
+        "Route 2 — Via Kawawa Rd": ["kilwa_mbagala", "changombe_road", "kigogo_roundabout", "morocco_intersection", "mwenge"],
+    },
+
+    # === NEW: REVERSE COMMUTE (CBD TO SUBURBS) ===
+    ("Posta / CBD", "Kimara"): {
+        "Route 1 — Morogoro Rd Direct": ["ubungo", "posta_to_kimara"],
+        "Route 2 — Via Kawawa & Sam Nujoma": ["tazara", "morocco_intersection", "sam_nujoma", "posta_to_kimara"],
+    },
+    ("Posta / CBD", "Tegeta"): {
+        "Route 1 — Bagamoyo Rd Direct": ["mwenge", "posta_to_tegeta"],
+        "Route 2 — Via Sam Nujoma": ["sam_nujoma", "mwenge", "old_bagamoyo", "posta_to_tegeta"],
+    },
+    ("Posta / CBD", "Mbagala"): {
+        "Route 1 — Kilwa Rd Direct": ["changombe_road", "kilwa_mbagala"],
+        "Route 2 — Via Mandela": ["tazara", "mandela_buguruni", "kilwa_mbagala"],
+    },
+    ("Posta / CBD", "Goba"): {
+        "Route 1 — Kawawa & Goba Rd": ["sam_nujoma", "morocco_intersection", "goba_massana"],
+        "Route 2 — Via Bagamoyo Rd": ["mwenge", "goba_massana"],
     }
 }
 
