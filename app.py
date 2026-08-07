@@ -18,7 +18,7 @@ from config import ROAD_COORDS, ROAD_PATHS
 st.set_page_config(
     page_title="Dar Traffic Command",
     layout="wide",
-    page_icon=":material/satellite_alt:",
+    page_icon="🌍",
     initial_sidebar_state="expanded",
 )
 
@@ -212,7 +212,7 @@ tz = pytz.timezone("Africa/Dar_es_Salaam")
 
 # --- 5. SIDEBAR: COMMAND CENTER ---
 with st.sidebar:
-    st.title(":material/memory: System Core")
+    st.title("🧠 System Core")
     st.markdown(
         '<div class="blob green"></div> **Live Network Active**', unsafe_allow_html=True
     )
@@ -245,7 +245,7 @@ with st.sidebar:
             pass
 
     if st.button(
-        "Force Satellite Sync", icon=":material/sync:", use_container_width=True
+        "🔄 Sync Live Data", use_container_width=True
     ):
         get_live_data.clear()
         st.rerun()
@@ -253,10 +253,9 @@ with st.sidebar:
     st.subheader("Data Export")
     if not df_raw.empty:
         st.download_button(
-            "Download Live CSV",
+            "📥 Download Live CSV",
             data=df_raw.to_csv(index=False).encode("utf-8"),
             file_name="dar_traffic_live.csv",
-            icon=":material/download:",
             use_container_width=True,
         )
 
@@ -312,7 +311,7 @@ if not df_raw.empty:
         <div style="font-size:0.72rem;color:#5C6680;">Across all corridors</div>
     </div>""", unsafe_allow_html=True)
     k4.markdown(f"""<div class="kpi-card">
-        <div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Capital Friction</div>
+        <div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Economic Impact</div>
         <div style="font-size:2rem;font-weight:800;color:#FF4757;margin:6px 0;">{friction_str}</div>
         <div style="font-size:0.72rem;color:#5C6680;">Wasted productivity</div>
     </div>""", unsafe_allow_html=True)
@@ -404,27 +403,26 @@ if not df_raw.empty:
         """, unsafe_allow_html=True)
 
         # AI Briefing
-        st.markdown('<div class="net-status-card">', unsafe_allow_html=True)
-        st.markdown('<div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">🤖 AI Executive Briefing</div>', unsafe_allow_html=True)
-        st.caption("Live macro-summary for logistics & fleet planning.")
-        gemini_key = os.getenv("GEMINI_API_KEY") or (
-            st.secrets.get("GEMINI_API_KEY")
-            if "GEMINI_API_KEY" in st.secrets
-            else None
-        )
-        if gemini_key:
-            genai.configure(api_key=gemini_key)
-            if st.button("Generate Dispatch Report", type="primary", use_container_width=True, icon=":material/graphic_eq:"):
-                with st.spinner("Analyzing macro-level routing data..."):
-                    try:
-                        prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
-                        response = genai.GenerativeModel("gemini-2.0-flash").generate_content(prompt)
-                        st.markdown(f'<div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:12px;font-size:0.85rem;color:#C8D0E0;line-height:1.6;margin-top:10px;">{response.text}</div>', unsafe_allow_html=True)
-                    except Exception as e:
-                        st.error(f"AI Error: {e}")
-        else:
-            st.info("Add GEMINI_API_KEY to enable AI Briefings.", icon=":material/key:")
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div style="font-size:0.7rem;color:#8892A4;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">🤖 AI Executive Briefing</div>', unsafe_allow_html=True)
+            st.caption("Live macro-summary for logistics & fleet planning.")
+            gemini_key = os.getenv("GEMINI_API_KEY") or (
+                st.secrets.get("GEMINI_API_KEY")
+                if "GEMINI_API_KEY" in st.secrets
+                else None
+            )
+            if gemini_key:
+                genai.configure(api_key=gemini_key)
+                if st.button("Generate Dispatch Report", type="primary", use_container_width=True):
+                    with st.spinner("Analyzing macro-level routing data..."):
+                        try:
+                            prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
+                            response = genai.GenerativeModel("gemini-2.0-flash").generate_content(prompt)
+                            st.markdown(f'<div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:12px;font-size:0.85rem;color:#C8D0E0;line-height:1.6;margin-top:10px;">{response.text}</div>', unsafe_allow_html=True)
+                        except Exception as e:
+                            st.error(f"AI Error: {e}")
+            else:
+                st.info("Add GEMINI_API_KEY to enable AI Briefings.", icon="🔑")
 
     with col_feed:
         st.markdown('<div class="section-header">◈ Live Node Telemetry Feed</div>', unsafe_allow_html=True)
