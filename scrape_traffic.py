@@ -11,8 +11,6 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
-import schedule
-import time
 
 # --- Configure Enterprise Logging ---
 logging.basicConfig(
@@ -262,8 +260,7 @@ def update_smart_city(road, weather_info):
 # ---------------------------------------------------------
 # 6. MAIN EXECUTION (CONCURRENT)
 # ---------------------------------------------------------
-def run_scraper():
-    global gmaps
+if __name__ == "__main__":
     logging.info("Booting Smart City Engine with Pydantic Validation & OSRM Engine...")
 
     if MAPS_API_KEY and MAPS_API_KEY != "YOUR_GOOGLE_API_KEY_HERE":
@@ -289,21 +286,6 @@ def run_scraper():
         ]
         concurrent.futures.wait(futures)
 
-    logging.info("Sync Complete! Going back to sleep...")
-
-
-if __name__ == "__main__":
-    logging.info("Traffic Scraper Worker Started. Running 24/7 on Koyeb...")
-    
-    # Run the first scrape immediately when the server boots
-    run_scraper()
-    
-    # Tell the script to run the job exactly every 20 minutes
-    schedule.every(20).minutes.do(run_scraper)
-    
-    # Keep the server alive forever and check the clock
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    logging.info("Sync Complete!")
 
 

@@ -2,9 +2,9 @@ name: Traffic Scraper Automation
 
 on:
   schedule:
-    # Runs every 20 minutes between 05:00 AM and 00:00 AM EATS
-    # (Dar es Salaam UTC+3 → 02:00 to 21:59 UTC)
-    - cron: '*/20 2-21 * * *'
+    # Runs every 30 minutes between 06:00 AM and 10:59 PM EATS
+    # (Dar es Salaam UTC+3 → 03:00 to 19:59 UTC)
+    - cron: '*/30 3-19 * * *'
 
   # Triggered manually or by repository_dispatch
   repository_dispatch:
