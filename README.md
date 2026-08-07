@@ -41,7 +41,7 @@ graph TD
     subgraph "4. Application & Intelligence"
         Streamlit[Streamlit Cloud Dashboard] -->|Queries History| FB
         Streamlit -->|Loads XGBoost| Repo
-        Streamlit -->|Context Injection (Math outputs)| Gemini[Google Gemini 2.0 Flash]
+        Streamlit -->|Context Injection - Math outputs| Gemini[Google Gemini 2.0 Flash]
         Gemini -->|Mshauri Fleet Dispatch Advice| Streamlit
     end
 
