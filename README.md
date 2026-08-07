@@ -1,10 +1,11 @@
-# <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6a6/512.gif" width="35" align="center"> Dar es Salaam Smart City: Traffic & Weather Engine
+# <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6a6/512.gif" width="35" align="center"> Dar es Salaam Traffic Command: AI-Powered Smart City Digital Twin
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/traffic_scraper.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=Scraper%20Status)
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/retrain_ai.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=AI%20Retraining)
 
 ![Firebase](https://img.shields.io/badge/Database-Firebase%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
-![Google Gemini](https://img.shields.io/badge/GenAI-Google%20Gemini-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/GenAI-Google%20Gemini%202.0-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white)
+![XGBoost](https://img.shields.io/badge/ML-XGBoost-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Engine-Python%203.10-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Dashboard-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
 
@@ -12,96 +13,80 @@
 
 ## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4cc/512.gif" width="28" align="center"> Project Overview
 
-An automated, cloud-native **Data Engineering Pipeline & Intelligence Dashboard** that monitors real-time traffic congestion and meteorological conditions across major arterial corridors in **Dar es Salaam, Tanzania**.
+Engineered an end-to-end, cloud-native **Data Engineering Pipeline, Predictive Intelligence Dashboard, and AI Copilot** to monitor and forecast real-time traffic congestion and meteorological conditions across major arterial corridors in Dar es Salaam, Tanzania.
 
-By synchronizing high-resolution time-series data from Google Maps and Weather APIs into a NoSQL Cloud Database, this project builds a "Digital Twin" of the city's mobility patterns. The system features a **Gemini 1.5-powered Radio Broadcast** and an **MLOps Predictive Engine** to generate live commute reports and advanced business analytics.
+Going beyond a traditional "Digital Twin," this system not only synchronizes high-resolution time-series data into a NoSQL Cloud Database but leverages that historical telemetry to actively predict urban bottlenecks and optimize commercial fleet logistics using state-of-the-art Machine Learning.
 
 ---
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e1/512.gif" width="28" align="center"> System Architecture
+## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e1/512.gif" width="28" align="center"> Live Architecture & Technical Flow
 
 ```mermaid
 graph TD
     subgraph "1. Orchestration & Ingestion"
-        GCS[Google Cloud Scheduler] -->|Webhook every 15m| GHA_Scraper[GitHub Actions: Scraper]
-        GHA_Scraper -->|Concurrent Threads| GMaps[Google Maps API]
+        GHA_Scraper[GitHub Actions: Scraper Cron] -->|Concurrent Threads| GMaps[Routing APIs]
         GHA_Scraper -->|Concurrent Threads| Weather[Open-Meteo API]
     end
 
     subgraph "2. Cloud Storage (NoSQL)"
-        GMaps -->|Parsed JSON| FB[(Firebase Firestore)]
+        GMaps -->|Parsed JSON & Pydantic Validation| FB[(Firebase Firestore)]
         Weather -->|Parsed JSON| FB
     end
 
     subgraph "3. MLOps Pipeline"
         GHA_ML[GitHub Actions: AI Retraining] -->|Weekly Fetch| FB
-        GHA_ML -->|Saves Model & Metrics| Repo[GitHub Repo: traffic_model.pkl]
+        GHA_ML -->|Trains XGBoost & Saves Model| Repo[GitHub Repo: traffic_model.pkl]
     end
 
     subgraph "4. Application & Intelligence"
         Streamlit[Streamlit Cloud Dashboard] -->|Queries History| FB
-        Streamlit -->|Loads Scikit-Learn| Repo
-        Streamlit -->|Context Prompt| Gemini[Google Gemini 3.5 API]
-        Gemini -->|Radio Broadcast| Streamlit
+        Streamlit -->|Loads XGBoost| Repo
+        Streamlit -->|Context Injection (Math outputs)| Gemini[Google Gemini 2.0 Flash]
+        Gemini -->|Mshauri Fleet Dispatch Advice| Streamlit
     end
 
     User((End User)) -->|Views| Streamlit
 ```
 
-> _The system uses a decoupled, high-performance architecture to ensure the frontend, data ingestion, and AI training environments operate independently._
-
-1.  **Orchestration:** **Google Cloud Scheduler** sends a precise 15-minute HTTP webhook to GitHub.
-2.  **High-Speed Ingestion:** GitHub Actions uses Python's `ThreadPoolExecutor` for concurrent scraping, reducing ingestion time by 90%.
-3.  **Storage:** Live and historical data snapshots are pushed securely to **Google Cloud Firestore (Firebase)**.
-4.  **GenAI Intelligence:** **Google Gemini 1.5 Flash** analyzes city-wide telemetry to generate dynamic "Radio Broadcast" commute advice.
-5.  **Automated ML:** A separate workflow crunches historical data weekly using Scikit-Learn to refine traffic predictions and track Model Drift (MAE & R²).
-6.  **Visualization:** **Streamlit Cloud** renders live 3D geospatial maps and professional BI heatmaps.
+1. **100% Autonomous Pipeline (Zero-Infrastructure):** Data ingestion runs continuously via GitHub Actions using an optimized Cron schedule (running every 30 minutes during active hours) to remain completely free while respecting CI/CD minute limits.
+2. **Data Ingestion & Processing:** A custom Python engine queries routing APIs and the Open-Meteo API, enforcing strict data contracts via `Pydantic`.
+3. **Cloud Storage (Hot & Cold):** Live, processed data is pushed directly to Google Cloud Firestore, instantly updating the frontend while preserving historical snapshots for offline ML training.
+4. **Predictive Machine Learning (XGBoost):** An embedded XGBoost regression model trained on over 1,000 real-world structural vectors (Day, Hour, Precipitation). The model actively predicts Origin-Destination (O-D) route delays with an **R² Confidence Score of 0.96** and a **Mean Absolute Error of ±0.94 minutes**.
+5. **Generative AI Copilot ("Mshauri"):** Integrated Google's Gemini 2.0 Flash LLM natively into the dashboard. Using a deterministic Context Injection strategy, the backend feeds hard mathematical route data to the LLM, which generates hallucination-free, human-readable dispatch advice for logistics operators.
 
 ---
 
 ## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/2728/512.gif" width="28" align="center"> Key Intelligence Features
 
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f916/512.gif" width="22" align="center"> **100% Autonomous Pipeline:** Powered by a 15-minute sync cycle controlled by Google Cloud.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f399/512.gif" width="22" align="center"> **AI Radio Broadcast:** Dynamic commute reports generated by Google Gemini.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4ca/512.gif" width="22" align="center"> **Advanced BI Analytics:** Interactive Heatmaps, Weather Correlation Box Plots, and Cost of Congestion metrics.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f30d/512.gif" width="22" align="center"> **3D Geospatial Mapping:** Real-time city congestion heatmap using `Pydeck`.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f510/512.gif" width="22" align="center"> **Enterprise Security:** Secure GitHub Secret vaulting and dual-environment Firebase authentication.
-
----
-
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6e0/512.gif" width="28" align="center"> Tech Stack & Tools
-
-<p align="left">
-  <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" />
-  <img src="https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white" />
-  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white" />
-  <img src="https://img.shields.io/badge/Google_Gemini-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white" />
-  <img src="https://img.shields.io/badge/Scikit_Learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" />
-  <img src="https://img.shields.io/badge/Github_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white" />
-</p>
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f916/512.gif" width="22" align="center"> **O-D Routing Engine:** Select an Origin and Destination to get full journey predictions generated by the XGBoost algorithm.
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f399/512.gif" width="22" align="center"> **Agentic LLM Copilot:** "Mshauri", a native Gemini 2.0 fleet advisor that explains model predictions in natural language (including fluent Swahili).
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4ca/512.gif" width="22" align="center"> **Enterprise BI Analytics:** Interactive Heatmaps, Unsupervised Spatial Clustering (K-Means), and Cost of Congestion metrics.
+- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f30d/512.gif" width="22" align="center"> **3D Geospatial Mapping:** Real-time city congestion heatmap utilizing `Pydeck`.
 
 ---
 
 ## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4a1/512.gif" width="28" align="center"> Engineering Milestones
 
 Building this enterprise-grade pipeline required overcoming real-world engineering hurdles:
-1.  **I/O Bottleneck Optimization:** Refactored sequential API calls into asynchronous `ThreadPoolExecutor` processes to prevent server timeouts.
-2.  **Separation of Concerns:** Isolated dependencies into `scraper_requirements.txt` vs `train_requirements.txt` to eliminate "Dependency Hell" in CI/CD.
-3.  **Decoupled Orchestration:** Migrated from GitHub Cron (unreliable) to **Google Cloud Scheduler** for precise, guaranteed telemetry execution.
+1. **Model Accuracy & R²:** Successfully transitioned from basic Scikit-Learn models to a highly optimized **XGBoost Regressor**, breaching the 1,000 training vector milestone and achieving 96% variance explanation.
+2. **LLM Hallucination Prevention:** Solved generative AI hallucination risks by building a strict "Context Injection" layer that forces the LLM to only interpret the hard math output by the XGBoost model.
+3. **I/O Bottleneck Optimization:** Refactored sequential API calls into asynchronous `ThreadPoolExecutor` processes.
+4. **Smart Cron Scheduling:** Designed a GitHub Actions schedule that aggressively tracks Dar es Salaam traffic during peak hours but sleeps overnight, perfectly circumventing GitHub's 2000-minute free-tier limit.
 
 ---
 
 ## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif" width="28" align="center"> Roadmap
 
 - [x] **Phase 1:** Migrate from flat CSVs to Cloud NoSQL (Firebase).
-- [x] **Phase 2:** Implement **Gemini 3.5** for automated commute broadcasting.
-- [x] **Phase 3:** Create a 15-minute automated concurrent scraper pipeline.
-- [x] **Phase 4:** Develop an automated MLOps retraining loop and Advanced Analytics Dashboard.
-- [ ] **Phase 5:** Develop a predictive traffic alerting system via WhatsApp API.
+- [x] **Phase 2:** Implement an automated concurrent scraper pipeline.
+- [x] **Phase 3:** Develop an automated MLOps retraining loop and Advanced Analytics Dashboard.
+- [x] **Phase 4:** Scale ML pipeline to **XGBoost** and achieve >0.90 R² accuracy.
+- [x] **Phase 5:** Integrate **Gemini 2.0** for agentic context-injection dispatching.
+- [ ] **Phase 6:** Develop a predictive traffic alerting system via WhatsApp API / Telegram.
 
 ---
 
 <p align="center">
   <b>Built with Love for the Tanzania Developer Community</b><br>
-  <i>Data Engineering Portfolio by John Mziray</i>
+  <i>Data Engineering & ML Portfolio by John Mziray</i>
 </p>
