@@ -30,10 +30,13 @@ jobs:
           FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
         run: python train_model.py
 
-      - name: Commit and Push Model + Metrics
+      - name: Run RL Training Script
+        run: python train_rl.py
+
+      - name: Commit and Push Models + Metrics
         run: |
           git config --global user.name 'AI Retraining Bot'
           git config --global user.email 'bot@dartraffic.ai'
-          git add traffic_model.pkl model_metrics.csv
-          git commit -m "auto: daily AI retrain — updated model + MLOps metrics [skip ci]" || echo "No changes to commit"
+          git add traffic_model.pkl model_metrics.csv rl_traffic_model.zip
+          git commit -m "auto: daily AI retrain — updated XGBoost + RL model [skip ci]" || echo "No changes to commit"
           git push

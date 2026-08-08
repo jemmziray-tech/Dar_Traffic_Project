@@ -17,3 +17,5 @@ numpy>=1.26.0
 pytz
 joblib
 
+gymnasium
+stable-baselines3[extra]
