@@ -41,7 +41,7 @@ def get_historical_data(road_id):
 
 
 # --- 4. Main UI Header ---
-st.title("📈 Route Telemetry & History")
+st.title(":material/show_chart: Route Telemetry & History")
 st.caption("Deep historical analysis of corridor performance, congestion cycles, and environmental impact")
 st.divider()
 
@@ -122,8 +122,8 @@ if selected_road:
         # --- TABBED INTERFACE ---
         tab_trends, tab_opt, tab_env = st.tabs(
             [
-                "📈 Live Trends & Forecast",
-                "⏱️ Commute Optimizer",
+                ":material/show_chart: Live Trends & Forecast",
+                ":material/timer: Commute Optimizer",
                 "🌡️ Environmental Impact",
             ]
         )
@@ -329,7 +329,7 @@ if selected_road:
                             if best_alt and time_saved > 0.5:
                                 st.success(
                                     f"**Pro Tip:** Shift to **{alt_time_str}** to avoid peak congestion and save **{time_saved:.1f} mins**.",
-                                    icon="💡",
+                                    icon=":material/lightbulb:",
                                 )
                             else:
                                 st.info(

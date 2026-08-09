@@ -17,7 +17,7 @@ from utils import get_db
 st.set_page_config(
     page_title="Dar Traffic Command",
     layout="wide",
-    page_icon="🌍",
+    page_icon=":material/public:",
     initial_sidebar_state="expanded",
 )
 
@@ -62,7 +62,7 @@ tz = pytz.timezone("Africa/Dar_es_Salaam")
 
 # --- 4. SIDEBAR: COMMAND CENTER ---
 with st.sidebar:
-    st.title("🧠 System Core")
+    st.title(":material/memory: System Core")
     st.markdown('<div class="blob green"></div> **Live Network Active**', unsafe_allow_html=True)
     st.caption(f"Local Time: {datetime.now(tz).strftime('%H:%M %Z')}")
     st.divider()
@@ -79,7 +79,7 @@ with st.sidebar:
         except Exception:
             pass
 
-    if st.button("🔄 Sync Live Data", use_container_width=True):
+    if st.button(":material/sync: Sync Live Data", use_container_width=True):
         get_live_data.clear()
         st.rerun()
 
@@ -133,7 +133,7 @@ if not df_raw.empty:
     st.write("")
 
     # --- 6. THE HIDDEN 4D MAP ---
-    with st.expander("🌍 Open Live Spatial Grid (4D Digital Twin)", expanded=False):
+    with st.expander(":material/public: Open Live Spatial Grid (4D Digital Twin)", expanded=False):
         st.caption("Live geospatial density visualization of current traffic conditions.")
         tooltip = {
             "html": "<b style='font-family: sans-serif; font-size: 14px;'>{name}</b><br/>Live Delay: <b>{delay_mins} mins</b>",
@@ -166,9 +166,9 @@ if not df_raw.empty:
         
         with st.container(border=True):
             if total_delay > 150:
-                st.error(f"**Critical congestion on {bottleneck_row['name']}**", icon="⚠️")
+                st.error(f"**Critical congestion on {bottleneck_row['name']}**", icon=":material/warning:")
             elif "Rain" in str(df_raw["weather"].iloc[0]) or "Drizzle" in str(df_raw["weather"].iloc[0]):
-                st.warning("**Precipitation detected — speeds reduced**", icon="🌧️")
+                st.warning("**Precipitation detected — speeds reduced**", icon=":material/water_drop:")
             else:
                 st.success("**All arteries flowing nominally**", icon="✅")
                 
@@ -177,7 +177,7 @@ if not df_raw.empty:
             st.write(f"Worst: **{bottleneck_row['name']}** (+{bottleneck_row['delay_mins']} mins)")
 
         # AI Briefing
-        st.subheader("🤖 AI Executive Briefing")
+        st.subheader(":material/smart_toy: AI Executive Briefing")
         with st.container(border=True):
             st.caption("Live macro-summary for logistics & fleet planning.")
             gemini_key = os.getenv("GEMINI_API_KEY") or (st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None)
@@ -206,7 +206,7 @@ if not df_raw.empty:
                 d = row["delay_mins"]
                 s = row["speed_kmh"]
                 weather_str_lower = str(row['weather']).lower()
-                w_icon = "🌧️" if "rain" in weather_str_lower or "storm" in weather_str_lower else ("☁️" if "cloud" in weather_str_lower or "overcast" in weather_str_lower else "☀️")
+                w_icon = ":material/water_drop:" if "rain" in weather_str_lower or "storm" in weather_str_lower else (":material/cloud:" if "cloud" in weather_str_lower or "overcast" in weather_str_lower else ":material/light_mode:")
                 
                 with cols[index]:
                     with st.container(border=True):
