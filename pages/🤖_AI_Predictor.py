@@ -18,45 +18,6 @@ st.set_page_config(
     page_icon=":material/online_prediction:",
 )
 
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif !important; background-color: #0A0F1E; color: #E8EAF0; }
-[data-testid="stSidebar"] { background: linear-gradient(180deg, #0D1426 0%, #0A0F1E 100%) !important; border-right: 1px solid rgba(0,212,255,0.1); }
-.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 98%; }
-div[data-testid="stMetricValue"] { font-weight: 700; font-size: 1.5rem !important; letter-spacing: -0.5px; color: #FFFFFF; }
-div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
-[data-testid="stMetricDelta"] { font-weight: 600; }
-.stChatInput { padding-bottom: 20px; }
-.page-header { font-size: 1.8rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.8px; }
-.page-sub { font-size: 0.85rem; color: #5C6680; margin-top: 4px; }
-.pred-result-card {
-    background: rgba(0,212,255,0.04);
-    border: 1px solid rgba(0,212,255,0.2);
-    border-radius: 14px;
-    padding: 24px;
-    text-align: center;
-    margin-top: 16px;
-}
-.pred-delay-value { font-size: 3.5rem; font-weight: 800; color: #FFFFFF; letter-spacing: -2px; line-height: 1; }
-.pred-delay-unit { font-size: 1rem; font-weight: 400; color: #8892A4; }
-.pred-status-badge {
-    display: inline-block; padding: 4px 14px;
-    border-radius: 20px; font-size: 0.8rem; font-weight: 700;
-    letter-spacing: 1px; text-transform: uppercase; margin-top: 12px;
-}
-.pred-smooth { background: rgba(46,213,115,0.12); color: #2ED573; border: 1px solid rgba(46,213,115,0.3); }
-.pred-moderate { background: rgba(255,165,2,0.12); color: #FFA502; border: 1px solid rgba(255,165,2,0.3); }
-.pred-jammed { background: rgba(255,71,87,0.12); color: #FF4757; border: 1px solid rgba(255,71,87,0.3); }
-.confidence-label { font-size: 0.75rem; color: #5C6680; margin-top: 10px; }
-.section-label { font-size: 0.7rem; font-weight: 600; color: #00D4FF; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
-.stButton > button { border-radius: 8px !important; font-weight: 600 !important; font-family: 'Inter', sans-serif !important; }
-.stButton > button[kind="primary"] { background: linear-gradient(135deg, #00D4FF, #0099CC) !important; border: none !important; color: #0A0F1E !important; }
-</style>
-""", unsafe_allow_html=True)
-
-
-
 # --- 2. CORE SYSTEM INITIALIZATION ---
 @st.cache_resource
 def load_ml_model():
@@ -83,7 +44,6 @@ tz = pytz.timezone("Africa/Dar_es_Salaam")
 
 # --- 3. MASTER ROAD DICTIONARY ---
 import sys
-import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config import ROAD_MAP, REVERSE_ROAD_MAP, ROUTES
 
@@ -119,7 +79,7 @@ def build_features_df(road_ids, target_day, hour_fraction, target_weather):
 
 
 # --- 4. HEADER UI ---
-st.title(":material/explore: AI Commute Predictor & Mshauri")
+st.title("🤖 AI Commute Predictor & Mshauri")
 st.caption(
     "Plan your journey using our XGBoost prediction engine and consult Mshauri (AI Copilot) for logistics advice."
 )
@@ -132,7 +92,7 @@ col_ml, col_chat = st.columns([1.5, 1], gap="large")
 # LEFT COLUMN (60%): DETERMINISTIC ROUTING ENGINE
 # =========================================================
 with col_ml:
-    st.subheader(":material/fork_right: Trip Parameters")
+    st.subheader("🛣️ Trip Parameters")
 
     # Input Form
     with st.container(border=True):
@@ -201,20 +161,24 @@ with col_ml:
             pass  # Fail gracefully, ensuring the app never crashes
 
         # C. Metric Display
-        st.subheader(":material/flag: Predicted Outcome")
+        st.subheader("🎯 Predicted Outcome")
         m1, m2 = st.columns(2)
-        m1.metric(
-            "Estimated Extra Delay",
-            f"{exact_prediction:.1f} Mins",
-            delta=status_text,
-            delta_color=pred_color,
-        )
-        m2.metric(
-            "Confidence Score",
-            confidence_score,
-            delta="Validated against historicals",
-            delta_color="normal",
-        )
+        with m1:
+            with st.container(border=True):
+                st.metric(
+                    "Estimated Extra Delay",
+                    f"{exact_prediction:.1f} Mins",
+                    delta=status_text,
+                    delta_color=pred_color,
+                )
+        with m2:
+            with st.container(border=True):
+                st.metric(
+                    "Confidence Score",
+                    confidence_score,
+                    delta="Validated against historicals",
+                    delta_color="normal",
+                )
 
         # D. Time-Shift Curve Generation (Predicting the entire route over time)
         start_frac = max(6.0, target_fraction - 1.5)
@@ -248,7 +212,6 @@ with col_ml:
             x="Hour",
             y="Predicted_Delay",
             hover_data={"Time_Label": True, "Hour": False},
-            template="plotly_dark",
             height=260,
         )
 
@@ -263,6 +226,9 @@ with col_ml:
         )
 
         fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#8892A4"),
             margin=dict(l=0, r=0, t=10, b=0),
             xaxis_title="",
             yaxis_title="Total Mins Delayed",
@@ -274,12 +240,12 @@ with col_ml:
             ),
             yaxis=dict(showgrid=True, gridcolor="#333333"),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
     else:
         st.error(
             "Predictive Model Offline: traffic_model.pkl not found.",
-            icon=":material/warning:",
+            icon="⚠️",
         )
 
 
@@ -287,14 +253,14 @@ with col_ml:
 # RIGHT COLUMN (40%): DARTRAFFIC COPILOT (MSHAURI)
 # =========================================================
 with col_chat:
-    st.subheader(":material/robot_2: Mshauri")
+    st.subheader("💬 Mshauri")
     st.caption("Ask our AI about alternatives, wait times, or strategy.")
 
     with st.container(border=True, height=530):
         if not genai_active:
             st.info(
                 "Configure GEMINI_API_KEY in environment to activate Mshauri.",
-                icon=":material/key:",
+                icon="🔑",
             )
         else:
             # Initialize Chat Memory

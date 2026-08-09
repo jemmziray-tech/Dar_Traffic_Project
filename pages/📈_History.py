@@ -4,54 +4,18 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore
+
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from utils import get_db, format_road_name, map_weather
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
     page_title="Route History", layout="wide", page_icon=":material/history:"
 )
 
-# --- PREMIUM DESIGN SYSTEM CSS ---
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif !important; background-color: #0A0F1E; color: #E8EAF0; }
-[data-testid="stSidebar"] { background: linear-gradient(180deg, #0D1426 0%, #0A0F1E 100%) !important; border-right: 1px solid rgba(0, 212, 255, 0.1); }
-.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 98%; }
-div[data-testid="stMetricValue"] { font-weight: 700; font-size: 1.5rem !important; letter-spacing: -0.5px; color: #FFFFFF; }
-div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
-.page-header { font-size: 1.8rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.8px; }
-.page-sub { font-size: 0.85rem; color: #5C6680; margin-top: 4px; }
-.section-label { font-size: 0.7rem; font-weight: 600; color: #00D4FF; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
-.stat-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(0,212,255,0.12); border-radius: 10px; padding: 16px 20px; }
-.stButton > button { border-radius: 8px !important; font-weight: 600 !important; font-family: 'Inter', sans-serif !important; }
-</style>
-""", unsafe_allow_html=True)
-
-
 # --- 2. Connect to Firebase ---
-@st.cache_resource
-def get_db():
-    if not firebase_admin._apps:
-        try:
-            if os.path.exists("firebase-key.json"):
-                cred = credentials.Certificate("firebase-key.json")
-            elif "firebase" in st.secrets:
-                key_dict = json.loads(st.secrets["firebase"]["key_data"])
-                cred = credentials.Certificate(key_dict)
-            else:
-                st.error("No valid Firebase credentials found.", icon=":material/lock:")
-                st.stop()
-            firebase_admin.initialize_app(cred)
-        except Exception as e:
-            st.error(f"Failed to connect: {e}", icon=":material/error:")
-            st.stop()
-    return firestore.client()
-
-
 db = get_db()
-
 
 # --- 3. Functions ---
 @st.cache_data(ttl=300)
@@ -76,23 +40,10 @@ def get_historical_data(road_id):
         return pd.DataFrame()
 
 
-def format_road_name(r_id):
-    return str(r_id).replace("_", " ").title()
-
-
-def map_weather(w):
-    """Safely categorizes weather without deleting rows"""
-    w = str(w).lower()
-    if any(r in w for r in ["rain", "drizzle", "storm", "shower"]):
-        return "Rainy"
-    if any(c in w for c in ["cloud", "overcast"]):
-        return "Cloudy"
-    return "Clear"
-
-
 # --- 4. Main UI Header ---
-st.markdown('<div class="page-header">📈 Route Telemetry & History</div><div class="page-sub">Deep historical analysis of corridor performance, congestion cycles, and environmental impact</div>', unsafe_allow_html=True)
-st.markdown("<div style='margin:16px 0;height:1px;background:linear-gradient(90deg,rgba(0,212,255,0.3),transparent);'></div>", unsafe_allow_html=True)
+st.title("📈 Route Telemetry & History")
+st.caption("Deep historical analysis of corridor performance, congestion cycles, and environmental impact")
+st.divider()
 
 # ROAD SELECTOR (Moved to main body for better UX)
 roads = get_roads_list()
@@ -148,24 +99,32 @@ if selected_road:
             )
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Live Status", current_status)
-        m2.metric(
-            "Current Delay",
-            f"{current_delay:.1f} Mins",
-            delta=f"{delay_delta:.1f}m vs {current_hour:02d}:00 Avg",
-            delta_color="off" if delay_delta == 0 else "inverse",
-        )
-        m3.metric("Historical Avg (This Hour)", f"{historical_avg:.1f} Mins")
-        m4.metric("Last Sensor Sync", current_time.strftime("%H:%M"))
+        with m1:
+            with st.container(border=True):
+                st.metric("Live Status", current_status)
+        with m2:
+            with st.container(border=True):
+                st.metric(
+                    "Current Delay",
+                    f"{current_delay:.1f} Mins",
+                    delta=f"{delay_delta:.1f}m vs {current_hour:02d}:00 Avg",
+                    delta_color="off" if delay_delta == 0 else "inverse",
+                )
+        with m3:
+            with st.container(border=True):
+                st.metric("Historical Avg (This Hour)", f"{historical_avg:.1f} Mins")
+        with m4:
+            with st.container(border=True):
+                st.metric("Last Sensor Sync", current_time.strftime("%H:%M"))
 
         st.write("")
 
         # --- TABBED INTERFACE ---
         tab_trends, tab_opt, tab_env = st.tabs(
             [
-                ":material/trending_up: Live Trends & Forecast",
-                ":material/schedule: Commute Optimizer",
-                ":material/thermostat: Environmental Impact",
+                "📈 Live Trends & Forecast",
+                "⏱️ Commute Optimizer",
+                "🌡️ Environmental Impact",
             ]
         )
 
@@ -206,10 +165,9 @@ if selected_road:
                 )
 
                 fig_area.update_layout(
-                    template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
-                    font=dict(family="Inter", color="#8892A4"),
+                    font=dict(color="#8892A4"),
                     height=350,
                     margin=dict(l=0, r=0, t=10, b=0),
                     xaxis_title="",
@@ -218,7 +176,7 @@ if selected_road:
                     xaxis=dict(showgrid=False),
                     yaxis=dict(showgrid=True, gridcolor="#333333"),
                 )
-                st.plotly_chart(fig_area, use_container_width=True)
+                st.plotly_chart(fig_area, use_container_width=True, theme="streamlit")
 
             with col_forecast:
                 st.markdown("**12-Hour Statistical Forecast**")
@@ -257,22 +215,20 @@ if selected_road:
                         forecast_df,
                         x="time_label",
                         y="delay_mins",
-                        template="plotly_dark",
                         height=350,
                     )
                     fig_forecast.update_traces(line_color="#00D4FF", fill="tozeroy")
                     fig_forecast.update_layout(
-                        template="plotly_dark",
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        font=dict(family="Inter", color="#8892A4"),
+                        font=dict(color="#8892A4"),
                         margin=dict(l=0, r=0, t=10, b=0),
                         xaxis_title="",
                         yaxis_title="Predicted Mins",
                         xaxis=dict(showgrid=False),
                         yaxis=dict(showgrid=True, gridcolor="#333333"),
                     )
-                    st.plotly_chart(fig_forecast, use_container_width=True)
+                    st.plotly_chart(fig_forecast, use_container_width=True, theme="streamlit")
 
         # ==========================================
         # TAB 2: COMMUTE OPTIMIZER
@@ -298,7 +254,7 @@ if selected_road:
                     active_hours = list(range(6, 24))
                     pivot_data = pivot_data.reindex(columns=active_hours).fillna(0)
 
-                    # 🚨 THE FIX: Auto-Scaling Heatmap for the Individual Road
+                    # Auto-Scaling Heatmap for the Individual Road
                     max_delay_for_road = pivot_data.max().max()
                     fig_heatmap = px.imshow(
                         pivot_data,
@@ -306,11 +262,10 @@ if selected_road:
                         y=pivot_data.index,
                         color_continuous_scale="YlOrRd",
                         aspect="auto",
-                        template="plotly_dark",
                         height=350,
                         zmax=(
                             max_delay_for_road if max_delay_for_road > 0 else 1
-                        ),  # Auto-adjusts the Dark Red peak!
+                        ),
                     )
                     fig_heatmap.update_traces(
                         xgap=2,
@@ -318,13 +273,12 @@ if selected_road:
                         hovertemplate="<b>%{y} at %{x}</b><br>Average Delay: %{z:.1f} mins<extra></extra>",
                     )
                     fig_heatmap.update_layout(
-                        template="plotly_dark",
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        font=dict(family="Inter", color="#8892A4"),
+                        font=dict(color="#8892A4"),
                         margin=dict(l=0, r=0, t=10, b=0), coloraxis_showscale=False
                     )
-                    st.plotly_chart(fig_heatmap, use_container_width=True)
+                    st.plotly_chart(fig_heatmap, use_container_width=True, theme="streamlit")
 
                 with col_shift:
                     st.markdown("**Time-Shift Optimizer**")
@@ -375,12 +329,12 @@ if selected_road:
                             if best_alt and time_saved > 0.5:
                                 st.success(
                                     f"**Pro Tip:** Shift to **{alt_time_str}** to avoid peak congestion and save **{time_saved:.1f} mins**.",
-                                    icon=":material/tips_and_updates:",
+                                    icon="💡",
                                 )
                             else:
                                 st.info(
                                     f"**{target_hour_str}** is an optimal time. Adjusting by an hour won't save significant time.",
-                                    icon=":material/task_alt:",
+                                    icon="✅",
                                 )
 
         # ==========================================
@@ -406,14 +360,12 @@ if selected_road:
                         "Cloudy": "#8892A4",
                         "Rainy": "#FF4757",
                     },
-                    template="plotly_dark",
                     points="all",
                 )
                 fig_speed.update_layout(
-                    template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
-                    font=dict(family="Inter", color="#8892A4"),
+                    font=dict(color="#8892A4"),
                     showlegend=False,
                     height=350,
                     margin=dict(l=0, r=0, t=10, b=0),
@@ -421,7 +373,7 @@ if selected_road:
                     yaxis_title="",
                 )
                 fig_speed.update_traces(marker=dict(opacity=0.3))
-                st.plotly_chart(fig_speed, use_container_width=True)
+                st.plotly_chart(fig_speed, use_container_width=True, theme="streamlit")
 
             with col_pie:
                 st.markdown("**Historical Status Distribution**")
@@ -434,22 +386,20 @@ if selected_road:
                         "Moderate": "#FFA502",
                         "Heavy Jam": "#FF4757",
                     },
-                    template="plotly_dark",
                 )
                 fig_pie.update_layout(
-                    template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
-                    font=dict(family="Inter", color="#8892A4"),
+                    font=dict(color="#8892A4"),
                     height=350, margin=dict(l=0, r=0, t=10, b=0), showlegend=False
                 )
                 fig_pie.update_traces(textposition="inside", textinfo="percent+label")
-                st.plotly_chart(fig_pie, use_container_width=True)
+                st.plotly_chart(fig_pie, use_container_width=True, theme="streamlit")
 
         # --- 7. Admin View ---
         st.write("")
         with st.expander(
-            ":material/admin_panel_settings: System Admin: Pipeline Health Monitor",
+            "⚙️ System Admin: Pipeline Health Monitor",
             expanded=False,
         ):
             df_health = hist_df.copy()
@@ -480,30 +430,33 @@ if selected_road:
             )
 
             c1, c2, c3 = st.columns(3)
-            c1.metric(
-                "Database Size (This Route)",
-                f"{actual_runs} Rows",
-                (
-                    f"Sync: Every {int(median_interval.total_seconds() / 60)} mins"
-                    if pd.notna(median_interval)
-                    else "Gathering..."
-                ),
-            )
-            c2.metric(
-                "Scraper Uptime",
-                f"{uptime_pct:.1f}%",
-                "Healthy" if uptime_pct >= 90 else "- Missing Runs",
-                delta_color="normal" if uptime_pct >= 90 else "inverse",
-            )
-            c3.metric(
-                "Data Corruption",
-                f"{total_nulls} Errors",
-                "Clean" if total_nulls == 0 else "- Requires Cleaning",
-                delta_color="normal" if total_nulls == 0 else "inverse",
-            )
+            with c1:
+                with st.container(border=True):
+                    st.metric(
+                        "Database Size (This Route)",
+                        f"{actual_runs} Rows",
+                        (
+                            f"Sync: Every {int(median_interval.total_seconds() / 60)} mins"
+                            if pd.notna(median_interval)
+                            else "Gathering..."
+                        ),
+                    )
+            with c2:
+                with st.container(border=True):
+                    st.metric(
+                        "Scraper Uptime",
+                        f"{uptime_pct:.1f}%",
+                        "Healthy" if uptime_pct >= 90 else "- Missing Runs",
+                        delta_color="normal" if uptime_pct >= 90 else "inverse",
+                    )
+            with c3:
+                with st.container(border=True):
+                    st.metric(
+                        "Data Corruption",
+                        f"{total_nulls} Errors",
+                        "Clean" if total_nulls == 0 else "- Requires Cleaning",
+                        delta_color="normal" if total_nulls == 0 else "inverse",
+                    )
 
     else:
-        st.info(
-            "Collecting telemetry data... check back after the next automated chron job.",
-            icon=":material/hourglass_empty:",
-        )
+        st.status("Collecting telemetry data... check back after the next automated cron job.", state="running")

@@ -1,70 +1,32 @@
 import os
-import json
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import joblib
+
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from utils import get_db, map_weather
 
 # --- 1. SETUP PAGE CONFIG ---
 st.set_page_config(
     page_title="Advanced Analytics", page_icon=":material/analytics:", layout="wide"
 )
 
-# --- PREMIUM DESIGN SYSTEM CSS ---
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif !important; background-color: #0A0F1E; color: #E8EAF0; }
-[data-testid="stSidebar"] { background: linear-gradient(180deg, #0D1426 0%, #0A0F1E 100%) !important; border-right: 1px solid rgba(0, 212, 255, 0.1); }
-.block-container { padding-top: 1.8rem; padding-bottom: 2rem; max-width: 98%; }
-div[data-testid="stMetricValue"] { font-weight: 700; font-size: 1.4rem !important; letter-spacing: -0.5px; color: #FFFFFF; }
-div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
-.page-header { font-size: 1.8rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.8px; }
-.page-sub { font-size: 0.85rem; color: #5C6680; margin-top: 4px; margin-bottom: 20px; }
-.stButton > button { border-radius: 8px !important; font-weight: 600 !important; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="page-header">📊 Enterprise Traffic Intelligence</div><div class="page-sub">Deep-dive business intelligence, unsupervised spatial clustering, and macro-economic impact analysis</div>', unsafe_allow_html=True)
-
+st.title("📊 Enterprise Traffic Intelligence")
+st.caption("Deep-dive business intelligence, unsupervised spatial clustering, and macro-economic impact analysis")
 
 # --- 2. SECURE FIREBASE CONNECTION ---
-@st.cache_resource
-def get_db():
-    if not firebase_admin._apps:
-        firebase_secret = os.getenv("FIREBASE_KEY_JSON")
-        if firebase_secret:
-            # GitHub Actions / local environment variable
-            cred = credentials.Certificate(json.loads(firebase_secret))
-        elif "firebase" in st.secrets:
-            # Streamlit Cloud — reads from st.secrets
-            key_dict = (
-                json.loads(st.secrets["firebase"]["key_data"])
-                if "key_data" in st.secrets["firebase"]
-                else dict(st.secrets["firebase"])
-            )
-            cred = credentials.Certificate(key_dict)
-        elif os.path.exists("firebase-key.json"):
-            # Local development fallback
-            cred = credentials.Certificate("firebase-key.json")
-        else:
-            st.error("Authentication failure: No Firebase credentials found.", icon=":material/lock:")
-            st.stop()
-        firebase_admin.initialize_app(cred)
-    return firestore.client()
-
-
+db = get_db()
 
 # --- 3. DATA FETCHING & SANITIZATION ---
 @st.cache_data(ttl=3600)
 def load_historical_data():
-    db = get_db()
+    from firebase_admin import firestore
     docs = (
         db.collection("traffic_history")
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
@@ -88,18 +50,6 @@ def load_historical_data():
         df["Hour"] = df["datetime"].dt.hour
         df["Day"] = df["datetime"].dt.day_name()
 
-        def map_weather(w):
-            w = str(w).lower()
-            if any(
-                rain_word in w
-                for rain_word in ["rain", "drizzle", "shower", "storm", "thunder"]
-            ):
-                return "Rainy"
-            elif any(cloud_word in w for cloud_word in ["cloud", "overcast"]):
-                return "Cloudy"
-            else:
-                return "Clear"
-
         if "weather" in df.columns:
             df["Condition"] = df["weather"].apply(map_weather)
         else:
@@ -115,7 +65,7 @@ with st.spinner("Compiling historical telemetry datasets..."):
 if df.empty:
     st.warning(
         "Insufficient historical telemetry. Awaiting further ingestion cycles.",
-        icon=":material/warning:",
+        icon="⚠️",
     )
     st.stop()
 
@@ -125,10 +75,10 @@ if df.empty:
 # ==========================================
 tab1, tab2, tab3, tab4 = st.tabs(
     [
-        ":material/timeline: Temporal Matrix",
-        ":material/hub: Behavioral Clustering",
-        ":material/account_balance: Economic Simulator",
-        ":material/memory: ML Proof & Metrics",
+        "📈 Temporal Matrix",
+        "🧠 Behavioral Clustering",
+        "💰 Economic Simulator",
+        "⚙️ ML Proof & Metrics",
     ]
 )
 
@@ -172,12 +122,11 @@ with tab1:
     )
     fig_heat.update_xaxes(tickmode="linear", dtick=1)
     fig_heat.update_layout(
-        template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter", color="#8892A4"),
+        font=dict(color="#8892A4"),
     )
-    st.plotly_chart(fig_heat, use_container_width=True)
+    st.plotly_chart(fig_heat, use_container_width=True, theme="streamlit")
 
 # ------------------------------------------
 # TAB 2: UNSUPERVISED BEHAVIORAL CLUSTERING
@@ -239,29 +188,32 @@ with tab2:
         fig_cluster.update_layout(
             height=550,
             hoverlabel=dict(bgcolor="#2b2b2b", font_color="white", font_size=14),
-            template="plotly_dark",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter", color="#8892A4"),
+            font=dict(color="#8892A4"),
         )
         
-        # --- NEW: K-MEANS HIGHLIGHT CARDS ---
+        # K-MEANS HIGHLIGHT CARDS
         try:
             most_volatile = cluster_data.loc[cluster_data["Volatility"].idxmax()]
             worst_gridlock = cluster_data.loc[cluster_data["Mean_Delay"].idxmax()]
             
             c1, c2 = st.columns(2)
-            c1.metric("Most Unpredictable Artery", most_volatile["name"], f"± {most_volatile['Volatility']:.1f} mins variance", delta_color="inverse")
-            c2.metric("Worst Chronic Gridlock", worst_gridlock["name"], f"{worst_gridlock['Mean_Delay']:.1f} mins avg delay", delta_color="inverse")
-            st.markdown("<br>", unsafe_allow_html=True)
+            with c1:
+                with st.container(border=True):
+                    st.metric("Most Unpredictable Artery", most_volatile["name"], f"± {most_volatile['Volatility']:.1f} mins variance", delta_color="inverse")
+            with c2:
+                with st.container(border=True):
+                    st.metric("Worst Chronic Gridlock", worst_gridlock["name"], f"{worst_gridlock['Mean_Delay']:.1f} mins avg delay", delta_color="inverse")
+            st.write("")
         except Exception:
             pass
 
-        st.plotly_chart(fig_cluster, use_container_width=True)
+        st.plotly_chart(fig_cluster, use_container_width=True, theme="streamlit")
     else:
         st.info(
             "Insufficient spatial variance to run K-Means clustering.",
-            icon=":material/info:",
+            icon="ℹ️",
         )
 
 # ------------------------------------------
@@ -296,12 +248,14 @@ with tab3:
     cost_df = cost_df.sort_values(by="Annual_Loss_TZS", ascending=True)
 
     total_city_loss = cost_df["Annual_Loss_TZS"].sum()
-    st.markdown(f"""
-    <div style="background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.3);border-radius:10px;padding:20px;text-align:center;margin-bottom:20px;">
-        <div style="color:#FF4757;font-size:0.9rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Total Annual City Economic Bleed</div>
-        <div style="color:#FFFFFF;font-size:2.5rem;font-weight:800;letter-spacing:-1px;">TZS {total_city_loss:,.0f}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        st.metric(
+            label="Total Annual City Economic Bleed",
+            value=f"TZS {total_city_loss:,.0f}",
+            delta="- Severe Capital Drain",
+            delta_color="inverse"
+        )
 
     fig_finance = px.bar(
         cost_df,
@@ -314,12 +268,11 @@ with tab3:
         height=600,
     )
     fig_finance.update_layout(
-        template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter", color="#8892A4"),
+        font=dict(color="#8892A4"),
     )
-    st.plotly_chart(fig_finance, use_container_width=True)
+    st.plotly_chart(fig_finance, use_container_width=True, theme="streamlit")
 
 # ------------------------------------------
 # TAB 4: EXPLAINABLE AI (XAI) & MLOPS VALIDATION
@@ -413,38 +366,20 @@ with tab4:
                     )
                     fig_importance.update_traces(marker_color="#00D4FF")
                     fig_importance.update_layout(
-                        template="plotly_dark",
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        font=dict(family="Inter", color="#8892A4"),
+                        font=dict(color="#8892A4"),
                     )
-                    st.plotly_chart(fig_importance, use_container_width=True)
+                    st.plotly_chart(fig_importance, use_container_width=True, theme="streamlit")
                 else:
                     st.warning(
                         "Could not extract feature importances from the model.",
-                        icon=":material/warning:",
+                        icon="⚠️",
                     )
             except Exception as e:
-                st.error("Model analysis unavailable. Check logs for details.", icon=":material/error:")
+                st.error("Model analysis unavailable. Check logs for details.", icon="❌")
         else:
-            st.markdown("""
-            <div style="background:rgba(255,165,2,0.06);border:1px solid rgba(255,165,2,0.2);
-                        border-radius:12px;padding:20px 24px;margin-top:8px;">
-                <div style="font-size:0.72rem;font-weight:700;color:#FFA502;letter-spacing:1px;
-                            text-transform:uppercase;margin-bottom:8px;">⚠ Model File Not Detected</div>
-                <div style="font-size:0.85rem;color:#C8D0E0;line-height:1.6;">
-                    <code style="background:rgba(255,255,255,0.07);padding:2px 6px;
-                                 border-radius:4px;font-size:0.8rem;">traffic_model.pkl</code>
-                    not found in the app directory.<br><br>
-                    The model retrains automatically every morning at 06:00 EAT via GitHub Actions.
-                    Check back after the next scheduled run, or run
-                    <code style="background:rgba(255,255,255,0.07);padding:2px 6px;
-                                 border-radius:4px;font-size:0.8rem;">python train_model.py</code>
-                    locally and push the result.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
+            st.warning("Model File Not Detected (`traffic_model.pkl`). The model retrains automatically every morning at 06:00 EAT via GitHub Actions.", icon="⚠️")
 
     with col_metrics:
         st.subheader("System Accuracy")
@@ -453,27 +388,30 @@ with tab4:
         try:
             metrics_df = pd.read_csv(metrics_path)
             latest_metrics = metrics_df.iloc[-1]
-            st.metric(
-                "Mean Absolute Error",
-                f"± {latest_metrics['MAE_Minutes']:.2f} mins",
-                delta="Operational",
-                delta_color="normal",
-            )
-            if "R2_Score" in metrics_df.columns:
+            with st.container(border=True):
                 st.metric(
-                    "R² Confidence Score",
-                    f"{latest_metrics['R2_Score']:.2f}",
-                    delta="Validated",
+                    "Mean Absolute Error",
+                    f"± {latest_metrics['MAE_Minutes']:.2f} mins",
+                    delta="Operational",
                     delta_color="normal",
                 )
-            st.metric(
-                "Total Training Vectors",
-                f"{int(latest_metrics['Total_Rows_Trained']):,}",
-            )
+            if "R2_Score" in metrics_df.columns:
+                with st.container(border=True):
+                    st.metric(
+                        "R² Confidence Score",
+                        f"{latest_metrics['R2_Score']:.2f}",
+                        delta="Validated",
+                        delta_color="normal",
+                    )
+            with st.container(border=True):
+                st.metric(
+                    "Total Training Vectors",
+                    f"{int(latest_metrics['Total_Rows_Trained']):,}",
+                )
         except FileNotFoundError:
-            st.info("Primary training metrics pending.", icon=":material/search_off:")
+            st.info("Primary training metrics pending.", icon="⏳")
 
-    st.write("")  # Spacer
+    st.write("")
 
     # BOTTOM HALF: The Truth Engine Validation Graph
     with st.container(border=True):
@@ -590,10 +528,9 @@ with tab4:
                         )
                     )
                     fig_val.update_layout(
-                        template="plotly_dark",
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        font=dict(family="Inter", color="#8892A4"),
+                        font=dict(color="#8892A4"),
                         xaxis_title="Time of Day",
                         yaxis_title="Delay (Minutes)",
                         hovermode="x unified",
@@ -608,12 +545,13 @@ with tab4:
                         margin=dict(t=20, b=0, l=0, r=0),
                     )
 
-                    st.plotly_chart(fig_val, use_container_width=True)
+                    st.plotly_chart(fig_val, use_container_width=True, theme="streamlit")
                     error_margin = abs(
                         df_val["delay_mins"] - df_val["Predicted_Delay"]
                     ).mean()
                     st.info(
-                        f"**Insight:** The model is predicting traffic for this specific artery within an average variance of **±{error_margin:.1f} minutes** from physical reality."
+                        f"**Insight:** The model is predicting traffic for this specific artery within an average variance of **±{error_margin:.1f} minutes** from physical reality.",
+                        icon="🧠"
                     )
                 else:
                     st.info(
