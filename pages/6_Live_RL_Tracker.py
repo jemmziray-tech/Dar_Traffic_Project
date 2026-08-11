@@ -10,7 +10,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import get_db
 
-st.set_page_config(page_title="Live RL Tracker", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="Live RL Tracker", page_icon=":material/psychology:", layout="wide")
 
 # --- PREMIUM DESIGN SYSTEM CSS ---
 st.markdown("""

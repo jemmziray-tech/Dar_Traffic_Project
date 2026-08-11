@@ -183,36 +183,38 @@ def update_smart_city(road, weather_info):
     try:
         raw_live_m = None
 
-        # 1. Primary Engine: OSRM (Open Source Routing Machine - 100% Free, No Billing)
-        try:
-            start_lat, start_lon = road["start"].split(",")
-            end_lat, end_lon = road["end"].split(",")
-            osrm_url = f"http://router.project-osrm.org/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}?overview=false"
-            res = requests.get(osrm_url, timeout=10).json()
+        # 1. Primary Engine: Google Maps Distance Matrix API (Live Traffic)
+        if gmaps is not None:
+            try:
+                result = gmaps.distance_matrix(
+                    origins=road["start"],
+                    destinations=road["end"],
+                    mode="driving",
+                    departure_time="now",
+                    traffic_model="best_guess",
+                )
+                element = result["rows"][0]["elements"][0]
+                if element["status"] == "OK":
+                    raw_live_m = element["duration_in_traffic"]["value"] // 60
+                else:
+                    logging.error(f"Google API Error for {road['name']}: {element['status']}")
+            except Exception as e:
+                logging.warning(f"Google Maps API failed, falling back to OSRM: {e}")
 
-            if res.get("code") == "Ok" and res.get("routes"):
-                route = res["routes"][0]
-                live_sec = route["duration"]
-                raw_live_m = max(1, int(round(live_sec / 60)))
-        except Exception as osrm_err:
-            logging.warning(f"OSRM engine lookup failed for {road['name']}: {osrm_err}")
+        # 2. Fallback Engine: OSRM (Open Source Routing Machine)
+        if raw_live_m is None:
+            try:
+                start_lat, start_lon = road["start"].split(",")
+                end_lat, end_lon = road["end"].split(",")
+                osrm_url = f"http://router.project-osrm.org/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}?overview=false"
+                res = requests.get(osrm_url, timeout=10).json()
 
-        # 2. Fallback Engine: Google Maps Distance Matrix API
-        if raw_live_m is None and gmaps is not None:
-            result = gmaps.distance_matrix(
-                origins=road["start"],
-                destinations=road["end"],
-                mode="driving",
-                departure_time="now",
-                traffic_model="best_guess",
-            )
-
-            element = result["rows"][0]["elements"][0]
-            if element["status"] == "OK":
-                raw_live_m = element["duration_in_traffic"]["value"] // 60
-            else:
-                logging.error(f"Google API Error for {road['name']}: {element['status']}")
-                return
+                if res.get("code") == "Ok" and res.get("routes"):
+                    route = res["routes"][0]
+                    live_sec = route["duration"]
+                    raw_live_m = max(1, int(round(live_sec / 60)))
+            except Exception as osrm_err:
+                logging.warning(f"OSRM engine lookup failed for {road['name']}: {osrm_err}")
 
         if raw_live_m is None:
             logging.error(f"Unable to resolve traffic telemetry for {road['name']}")

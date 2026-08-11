@@ -12,7 +12,7 @@ from firebase_admin import credentials, firestore
 st.set_page_config(
     page_title="Route Planner — Dar Traffic",
     layout="wide",
-    page_icon="🗺️",
+    page_icon=":material/map",
     initial_sidebar_state="expanded",
 )
 

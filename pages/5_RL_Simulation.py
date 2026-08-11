@@ -15,7 +15,7 @@ try:
 except ImportError:
     RL_AVAILABLE = False
 
-st.set_page_config(page_title="RL Traffic Simulation", page_icon="🚦", layout="wide")
+st.set_page_config(page_title="RL Traffic Simulation", page_icon=":material/traffic:", layout="wide")
 
 # --- PREMIUM DESIGN SYSTEM CSS ---
 st.markdown("""
