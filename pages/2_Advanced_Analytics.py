@@ -471,9 +471,9 @@ with tab4:
                 if not df_val.empty:
                     df_val = df_val.sort_values("timestamp")
                     df_val["timestamp"] = pd.to_datetime(
-                        df_val["timestamp"]
+                        df_val["timestamp"], utc=True
                     ).dt.tz_convert("Africa/Dar_es_Salaam")
-                    df_val["Readable_Time"] = df_val["timestamp"].dt.strftime("%H:%M")
+                    df_val["Readable_Time"] = df_val["timestamp"].dt.strftime("%b %d, %H:%M")
                     df_val["Hour"] = df_val["timestamp"].dt.hour + (
                         df_val["timestamp"].dt.minute / 60.0
                     )
@@ -488,7 +488,7 @@ with tab4:
                     if "precipitation_mm" not in df_val.columns:
                         df_val["precipitation_mm"] = 0.0
                     df_val["precipitation_mm"] = df_val["precipitation_mm"].fillna(0.0).astype(float)
-                    df_val["delay_velocity"] = 0.0
+                    df_val["previous_delay"] = 0.0
 
                     pred_features = df_val[
                         [
@@ -500,7 +500,7 @@ with tab4:
                             "temp_c",
                             "is_raining",
                             "precipitation_mm",
-                            "delay_velocity",
+                            "previous_delay",
                         ]
                     ]
 

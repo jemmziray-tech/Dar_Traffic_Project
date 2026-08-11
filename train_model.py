@@ -117,9 +117,7 @@ print("🌪️ Calculating 20-Minute Traffic Velocity (Delta)...")
 # Sort chronologically so we can compare a row to the row exactly 20 mins prior
 df = df.sort_values(by=["road_id", "timestamp"])
 df["previous_delay"] = df.groupby("road_id")["delay_mins"].shift(1)
-# Calculate momentum: positive = getting worse, negative = clearing
-df["delay_velocity"] = df["delay_mins"] - df["previous_delay"]
-df["delay_velocity"] = df["delay_velocity"].fillna(0)  # Fill first rows with 0
+df["previous_delay"] = df["previous_delay"].fillna(0)  # Fill first rows with 0
 
 
 # Define our features.
@@ -132,7 +130,7 @@ features = [
     "temp_c",
     "is_raining",
     "precipitation_mm",
-    "delay_velocity",
+    "previous_delay",
 ]
 X = df[features]
 y = df["delay_mins"]
@@ -159,7 +157,7 @@ preprocessor = ColumnTransformer(
                 "temp_c",
                 "is_raining",
                 "precipitation_mm",
-                "delay_velocity",
+                "previous_delay",
             ],
         ),
         ("cat", TargetEncoder(), ["road_id"]),

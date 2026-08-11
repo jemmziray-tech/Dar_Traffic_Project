@@ -7,4 +7,6 @@ numpy>=1.26.0
 python-dotenv>=1.0.0
 pytz
 gymnasium>=0.29.0
-stable-baselines3>=2.0.0
+stable-baselines3>=2.0.0
+tqdm>=4.66.0
+rich>=13.0.0
