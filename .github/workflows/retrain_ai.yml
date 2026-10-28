@@ -8,6 +8,8 @@ on:
 
 jobs:
   retrain:
+    # Paused for the user-requested data reset. Re-enable after ingestion is corrected.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

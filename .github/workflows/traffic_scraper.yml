@@ -14,6 +14,8 @@ on:
 
 jobs:
   scrape:
+    # Paused for the user-requested data reset. Re-enable after ingestion is corrected.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     # Hard timeout: kill job if it exceeds 8 minutes (prevents queue buildup)
     timeout-minutes: 8
