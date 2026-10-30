@@ -1,3 +1,4 @@
+# Dashboard uses the public read-only dar-traffic REST connection; rebuild after migration.
 requests>=2.31.0
 googlemaps>=4.10.0
 firebase-admin>=6.5.0
