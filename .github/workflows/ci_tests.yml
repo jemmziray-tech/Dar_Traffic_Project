@@ -27,4 +27,4 @@ jobs:
           pip install pytest pandas streamlit --quiet
 
       - name: Run Unit Tests
-        run: pytest tests/ -v
+        run: python -m pytest tests/ -v
