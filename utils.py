@@ -16,27 +16,10 @@ def get_secret(name, default=None):
 
 @st.cache_resource
 def get_db():
-    """Initializes and returns a singleton Firestore client."""
-    if not firebase_admin._apps:
-        try:
-            firebase_secret = os.getenv("FIREBASE_KEY_JSON")
-            if firebase_secret:
-                # GitHub Actions / local environment variable
-                cred = credentials.Certificate(json.loads(firebase_secret))
-            elif get_secret("firebase"):
-                # Streamlit Cloud — reads from st.secrets
-                key_dict = json.loads(st.secrets["firebase"]["key_data"]) if "key_data" in st.secrets["firebase"] else dict(st.secrets["firebase"])
-                cred = credentials.Certificate(key_dict)
-            elif os.path.exists("firebase-key.json"):
-                # Local development fallback
-                cred = credentials.Certificate("firebase-key.json")
-            else:
-                cred = credentials.ApplicationDefault()
-            firebase_admin.initialize_app(cred)
-        except Exception as e:
-            st.error(f"Failed to connect to Firebase: {e}", icon="⚠️")
-            st.stop()
-    return firestore.client()
+    """Read only the fresh project's public traffic; never load old credentials."""
+    from firestore_public import PublicTrafficReader
+    return PublicTrafficReader()
+
 
 def format_road_name(road_id):
     """Formats a road_id string into a Title Case human-readable name."""
