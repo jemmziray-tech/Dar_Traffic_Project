@@ -222,7 +222,8 @@ def analytics():
     st.subheader('Collection coverage')
     coverage = frame.assign(day=dates).groupby(['name','day']).size().reset_index(name='Observations')
     chart(px.scatter(coverage, x='day', y='name', size='Observations',
-                     labels={'day':'Date (EAT)','name':'Corridor'}, color_discrete_sequence=[COLOUR]))
+                     labels={'day':'Date (EAT)','name':'Corridor'}, color_discrete_sequence=[COLOUR])
+          .update_xaxes(type='category'))
     download(frame, 'dar-traffic-validated-history.csv')
 
 
