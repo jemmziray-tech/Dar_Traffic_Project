@@ -12,7 +12,7 @@ The old `dar-traffic-command` Firebase project is not used by the current applic
 
 ## Collector
 
-The `Collect traffic` workflow in `.github/workflows/traffic_scraper.yml` has a manual trigger only. Running it makes billable Maps requests and writes observations. Do not use a workflow run as a routine health check.
+The `Collect traffic` workflow in `.github/workflows/traffic_scraper.yml` runs every 30 minutes from 06:00 through 22:30 EAT. The cron expression `0,30 3-19 * * *` is interpreted in UTC. This schedules 34 runs/day and 714 routing elements/day for 21 corridors before retries. A manual trigger is also available for additional runs. GitHub schedules can be delayed; this is not an exact-time service. Running it makes billable Maps requests and writes observations. Do not use a workflow run as a routine health check.
 
 GitHub Actions authenticates through Workload Identity Federation:
 
@@ -46,4 +46,4 @@ If the database cannot be reached, the app shows an unavailable state. If observ
 
 ## Future work
 
-Before enabling recurring collection, decide its cadence and budget and review provider retention and use requirements. Before adding forecasts, collect an appropriate history, evaluate on later dates against simple baselines, and publish error in minutes with coverage. Earlier training scripts and simulations were removed from the active tree because they do not meet the fresh-project contract; they remain in Git history.
+The recurring cadence was enabled with the owner’s approval. Changing it or adding manual runs changes usage and charges. Review provider retention and use requirements before expanding storage. The standard [Google Maps terms, section 3.2.3(c)](https://cloud.google.com/maps-platform/terms) prohibit training, testing or validating models with Maps content. Obtain suitable rights or a separate dataset licensed for modelling before building a training pipeline. Then collect an appropriate history, evaluate on later dates against simple baselines, and publish error in minutes with coverage. Earlier training scripts and simulations were removed from the active tree because they do not meet the fresh-project contract; they remain in Git history.

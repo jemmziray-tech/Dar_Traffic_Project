@@ -24,4 +24,4 @@ History reads are capped at 5,000 newest documents across the project and cached
 
 Run `python -m pytest tests/ -q`. Tests exercise every view through the main navigation with populated, empty and outage responses; search and scenario interactions; stale/invalid/future/legacy exclusion; collector precision; scenario bounds; observed-hour support; the public reader and collection guards. Browser checks additionally cover real database reads and navigation.
 
-Collection is manual-only and there is no active training pipeline. A model should be evaluated on later held-out dates, compared with simple baselines, and reported with errors in minutes before any forecast UI is enabled. See [operating instructions](OPERATIONS.md) before expanding collection or storage.
+Collection is scheduled every 30 minutes from 06:00 to 22:30 EAT. There is no active training pipeline. A model should be evaluated on later held-out dates, compared with simple baselines, and reported with errors in minutes before any forecast UI is enabled. See [operating instructions](OPERATIONS.md) before expanding collection or storage.

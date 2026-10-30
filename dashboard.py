@@ -392,11 +392,16 @@ def forecasts():
         "No validated forecasting model is published for the fresh database. Predicted arrival times are unavailable."
     )
     a, b = st.columns(2)
-    a.metric("Fresh-project training observations", len(frame))
+    a.metric("Stored traffic observations", len(frame))
     b.metric("Observed calendar days", days)
     st.caption(
         "Counts cover the latest 5,000 history records, not the entire lifetime of the project."
     )
+    st.warning(
+        "Google Maps traffic estimates are not a training dataset under the standard Maps terms. "
+        "Use data licensed for modelling, or obtain appropriate rights, before training or evaluating a model."
+    )
+    st.link_button("Google Maps use restrictions", "https://cloud.google.com/maps-platform/terms")
     st.subheader("Model evaluation requirements")
     st.write(
         "Collect repeated observations across peak and off-peak periods; reserve later dates for evaluation; "

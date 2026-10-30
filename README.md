@@ -16,7 +16,7 @@ The collector requests traffic-aware travel estimates from Google Distance Matri
 
 Forecasting is not available: no model has been validated against the fresh database. There is no traffic-signal control, city-wide efficiency score or measured economic-loss estimate.
 
-Collection is **manual-only**. No background collection or training schedule is enabled. The app excludes observations older than 90 minutes from current summaries, so it will show stale data when collection has not run recently.
+Collection runs **every 30 minutes, 06:00-22:30 EAT**, with a manual trigger available when needed. This is 34 scheduled runs, or 714 routing elements for 21 corridors, per day before retries. Model training is not enabled. The app excludes observations older than 90 minutes from current summaries, so it will show stale data when collection has not run recently.
 
 ## Architecture
 
@@ -24,7 +24,8 @@ The project has two parts: a collector that writes observations, and a website t
 
 ```mermaid
 flowchart TD
-    Maintainer[Maintainer] -->|Start a manual run| Workflow
+    Schedule[Every 30 minutes: 06:00-22:30 EAT] --> Workflow
+    Maintainer[Maintainer] -->|Optional manual run| Workflow
 
     subgraph GitHub[GitHub repository and Actions]
         Workflow[Collect traffic workflow]
@@ -69,7 +70,7 @@ flowchart TD
 
 ### How an observation reaches the dashboard
 
-1. A maintainer starts the collection workflow. GitHub uses Workload Identity Federation to obtain short-lived Google Cloud credentials; there is no downloaded service-account key.
+1. The schedule starts the collection workflow, or a maintainer starts an additional manual run. GitHub uses Workload Identity Federation to obtain short-lived Google Cloud credentials; there is no downloaded service-account key.
 2. The collector requests traffic estimates for the endpoint pairs in `config.py`. Open-Meteo supplies weather context, which does not alter the traffic measurements.
 3. Each successful corridor is written to the live and history collections in one Firestore batch. A failed request leaves the previous live observation intact and makes the workflow report a failure.
 4. Streamlit reads the two collections through the public REST API. It checks the source, values and timestamps before displaying them. Current summaries exclude stale records; historical views retain their timestamps.
@@ -80,7 +81,7 @@ The Maps API key and Google Cloud credentials serve different purposes. The key 
 
 The earlier version included forecasting, a Gemini assistant and reinforcement-learning experiments. Those are not running in the current application. The forecast page explains the available data and evaluation requirements. The what-if lab is an arithmetic tool, not a trained policy or a connection to real traffic signals.
 
-A future forecasting pipeline would read permitted historical data, evaluate a model on later dates, compare it with simple baselines, and publish its error before serving predictions. That is planned work, not an existing service or a claimed accuracy result.
+The standard [Google Maps terms, section 3.2.3(c)](https://cloud.google.com/maps-platform/terms) prohibit using Maps content to train, test or validate models. A future forecasting pipeline needs independently collected or otherwise appropriately licensed data. It would read that permitted history, evaluate a model on later dates, compare it with simple baselines, and publish its error before serving predictions. That is planned work, not an existing service or a claimed accuracy result.
 
 ## Run locally
 

@@ -1,7 +1,9 @@
 name: Collect traffic
 
-# Collection is manual-only. Enabling a schedule requires a separate decision.
+# 03:00-19:30 UTC is 06:00-22:30 EAT: 34 runs per day.
 on:
+  schedule:
+    - cron: "0,30 3-19 * * *"
   workflow_dispatch:
 
 permissions:
