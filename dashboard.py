@@ -39,6 +39,11 @@ def shell(index):
     h2,h3 {letter-spacing:-.025em!important}
     [data-testid="stMetricValue"] {font-variant-numeric:tabular-nums}
     [data-testid="stSidebar"] {border-right:1px solid #233445}
+    @media (max-width:1000px) {
+      [data-testid="stHorizontalBlock"] {flex-wrap:wrap!important}
+      [data-testid="stColumn"] {min-width:min(100%,190px)!important;flex:1 1 190px!important}
+      [data-testid="stMetricValue"] {font-size:1.8rem!important}
+    }
     .eyebrow {color:#54D6B2;font-size:.76rem;font-weight:600;letter-spacing:.16em;margin-bottom:.7rem}
     </style>''', unsafe_allow_html=True)
     with st.sidebar:
