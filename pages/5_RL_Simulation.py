@@ -34,7 +34,7 @@ div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.75rem
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="page-header">🚦 Autonomous RL Intersection Control</div><div class="page-sub">Live Deep Q-Network (DQN) agent dynamically adjusting traffic lights to minimize gridlock.</div>', unsafe_allow_html=True)
+st.markdown('<div class="page-header">🚦 RL Intersection Simulation</div><div class="page-sub">Simulated traffic queues controlled by a trained DQN policy. No real traffic lights are connected.</div>', unsafe_allow_html=True)
 
 if not RL_AVAILABLE:
     st.error("Reinforcement Learning packages are not installed or model is missing. Please run `pip install stable-baselines3[extra] gymnasium` and then run `python train_rl.py`.")

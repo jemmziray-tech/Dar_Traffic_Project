@@ -12,7 +12,7 @@ from firebase_admin import credentials, firestore
 st.set_page_config(
     page_title="Route Planner — Dar Traffic",
     layout="wide",
-    page_icon=":material/map",
+    page_icon=":material/map:",
     initial_sidebar_state="expanded",
 )
 
@@ -98,26 +98,8 @@ div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.72rem
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. FIREBASE CONNECTION
 # ─────────────────────────────────────────────────────────────────────────────
-@st.cache_resource
-def get_db():
-    if not firebase_admin._apps:
-        firebase_secret = os.getenv("FIREBASE_KEY_JSON")
-        if firebase_secret:
-            cred = credentials.Certificate(json.loads(firebase_secret))
-        elif os.path.exists("firebase-key.json"):
-            cred = credentials.Certificate("firebase-key.json")
-        elif "firebase" in st.secrets:
-            key_dict = (
-                json.loads(st.secrets["firebase"]["key_data"])
-                if "key_data" in st.secrets["firebase"]
-                else dict(st.secrets["firebase"])
-            )
-            cred = credentials.Certificate(key_dict)
-        else:
-            st.error("Authentication failure: No Firebase credentials found.")
-            st.stop()
-        firebase_admin.initialize_app(cred)
-    return firestore.client()
+from utils import get_db, fresh_traffic_frame
+import pandas as pd
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. DAR ES SALAAM ROAD NETWORK GRAPH
@@ -138,16 +120,16 @@ ORIGINS = sorted(list(set(o for o, _ in ROUTES.keys())))
 def get_live_delays():
     db = get_db()
     docs = db.collection("live_traffic").stream()
+    records = fresh_traffic_frame(pd.DataFrame([doc.to_dict() for doc in docs]))
     delays = {}
     speeds = {}
     weathers = {}
-    for doc in docs:
-        d = doc.to_dict()
-        road_id = d.get("road_id", doc.id)
+    for d in records.to_dict("records"):
+        road_id = d["road_id"]
         delays[road_id] = d.get("delay_mins", 0)
         speeds[road_id] = d.get("speed_kmh", 30)
         weathers[road_id] = d.get("weather", "Clear")
-    return delays, speeds, weathers
+    return delays, speeds, weathers, {d["road_id"]: d for d in records.to_dict("records")}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. HELPER: Color for delay
@@ -209,12 +191,15 @@ if route_key not in ROUTES:
 
 # Auto-compute on load, also on button click
 with st.spinner("Fetching live corridor telemetry..."):
-    live_delays, live_speeds, live_weathers = get_live_delays()
+    live_delays, live_speeds, live_weathers, live_records = get_live_delays()
+st.warning("Corridor comparison only: these monitored segments do not form verified end-to-end journeys. Times exclude gaps and may include overlapping sections.")
 
 route_options = ROUTES[route_key]
 computed_routes = {}
 
 for route_name, road_ids in route_options.items():
+    if any(rid not in live_records for rid in road_ids):
+        continue
     segments = []
     total_mins = 0
     total_delay = 0
@@ -225,8 +210,8 @@ for route_name, road_ids in route_options.items():
         weather = live_weathers.get(rid, "Clear")
         display_name = ROAD_IDS.get(rid, rid.replace("_", " ").title())
         # Estimate base travel: 30 km/h free-flow assumption per segment
-        seg_free_mins = max(8, round(30 / max(speed, 1) * 10))
-        seg_total = seg_free_mins + delay
+        seg_free_mins = live_records[rid]["normal_mins"]
+        seg_total = live_records[rid]["live_mins"]
         segments.append({
             "name": display_name,
             "delay": delay,
@@ -244,6 +229,10 @@ for route_name, road_ids in route_options.items():
         "total_delay": total_delay,
         "base_mins": base_mins,
     }
+
+if not computed_routes:
+    st.info("No complete set of fresh observations is available for these corridors.")
+    st.stop()
 
 # Sort by total time — best route first
 sorted_routes = sorted(computed_routes.items(), key=lambda x: x[1]["total_mins"])
@@ -310,7 +299,7 @@ with right_col:
         dep_tip = "🌤️ Midday — conditions are moderate. **Now is a good time to travel.** Delays are near daily minimum."
         tip_color = "#2ED573"
     else:
-        dep_tip = "✅ Off-peak window. **Conditions are optimal right now.** Depart when ready."
+        dep_tip = "Typical off-peak period. Check the latest observations before departing."
         tip_color = "#2ED573"
 
     st.markdown(f"""

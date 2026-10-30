@@ -29,8 +29,8 @@ def get_historical_data(road_id):
     stats_ref = db.collection("traffic_history")
     try:
         # Stream by road_id without composite order_by to avoid missing index errors
-        results = stats_ref.where("road_id", "==", road_id).limit(20000).stream()
-        df_res = pd.DataFrame([doc.to_dict() for doc in results])
+        results = stats_ref.order_by("timestamp", direction="DESCENDING").limit(5000).stream()
+        df_res = pd.DataFrame([d for doc in results if (d := doc.to_dict()).get("road_id") == road_id and d.get("schema_version") == 2])
         if not df_res.empty and "timestamp" in df_res.columns:
             df_res["timestamp_dt"] = pd.to_datetime(df_res["timestamp"], utc=True)
             df_res = df_res.sort_values("timestamp_dt", ascending=False).drop(columns=["timestamp_dt"])

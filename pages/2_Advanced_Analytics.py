@@ -37,6 +37,8 @@ def load_historical_data():
     data = []
     for doc in docs:
         row = doc.to_dict()
+        if row.get("schema_version") != 2:
+            continue
         if "timestamp" in row and row["timestamp"]:
             row["datetime"] = row["timestamp"]
         data.append(row)

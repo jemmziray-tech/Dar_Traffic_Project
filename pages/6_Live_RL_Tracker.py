@@ -8,7 +8,7 @@ import pytz
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import get_db
+from utils import get_db, fresh_traffic_frame
 
 st.set_page_config(page_title="Live RL Tracker", page_icon=":material/psychology:", layout="wide")
 
@@ -29,7 +29,7 @@ div[data-testid="stMetricLabel"] { color: #8892A4 !important; font-size: 0.85rem
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="page-header">🧠 Live RL Performance Tracker</div><div class="page-sub">Real-time projection of Reinforcement Learning optimization applied to live Dar es Salaam traffic telemetry.</div>', unsafe_allow_html=True)
+st.markdown('<div class="page-header">🧠 RL What-if Scenario</div><div class="page-sub">Real-time projection of Reinforcement Learning optimization applied to live Dar es Salaam traffic telemetry.</div>', unsafe_allow_html=True)
 
 # Fetch Live Data
 @st.cache_data(ttl=15)
@@ -41,7 +41,7 @@ def get_live_tracker_data():
         row = doc.to_dict()
         row["id"] = doc.id
         data.append(row)
-    return pd.DataFrame(data)
+    return fresh_traffic_frame(pd.DataFrame(data))
 
 with st.spinner("Fetching live telemetry..."):
     df_live = get_live_tracker_data()
@@ -51,7 +51,8 @@ if df_live.empty:
     st.stop()
 
 # Calculations (Based on the 70.1% RL Reduction Factor)
-RL_REDUCTION_FACTOR = 0.701
+st.warning("Illustrative scenario only. No traffic lights are controlled by this application, and these savings have not been validated on real roads.")
+RL_REDUCTION_FACTOR = st.slider("Assumed reduction in delay", 0.0, 1.0, 0.3, 0.05)
 total_fixed_delay = df_live["delay_mins"].sum()
 total_rl_delay = total_fixed_delay * (1 - RL_REDUCTION_FACTOR)
 total_saved = total_fixed_delay - total_rl_delay
@@ -63,7 +64,7 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     with st.container(border=True):
-        st.markdown('<div class="header-badge">REALITY (FIXED-TIME)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="header-badge">OBSERVED DELAY</div>', unsafe_allow_html=True)
         st.metric(label="Current Network Delay", value=f"{int(total_fixed_delay)} mins", delta="Inefficient Control", delta_color="inverse")
 
 with col2:
@@ -74,7 +75,7 @@ with col2:
 with col3:
     with st.container(border=True):
         st.markdown('<div class="header-badge" style="border-color:#FFA502; color:#FFA502; background:rgba(255,165,2,0.1);">IMPACT</div>', unsafe_allow_html=True)
-        st.metric(label="Total Time Saved", value=f"{int(total_saved)} mins", delta="70.1% Improvement", delta_color="normal")
+        st.metric(label="Total Time Saved", value=f"{int(total_saved)} mins", delta="Assumed improvement", delta_color="normal")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -132,15 +133,14 @@ with colB:
     
     w1, w2 = st.columns(2)
     w1.metric("Current Wait", f"{worst_road['delay_mins']}m")
-    w2.metric("RL Projected", f"{int(worst_road['delay_mins'] * 0.299)}m", "-70%", delta_color="normal")
+    w2.metric("RL Projected", f"{int(worst_road['delay_mins'] * (1 - RL_REDUCTION_FACTOR))}m", "Scenario", delta_color="normal")
     
     st.divider()
     
     st.markdown("**How this works:**")
     st.markdown(
-        "This dashboard tracks live telemetry from Dar es Salaam arteries. "
-        "It actively contrasts current congestion (caused by fixed-time legacy signals) against "
-        "the scientifically verified **70.1% queue reduction** achieved by our Deep Q-Network (DQN) model."
+        "This comparison applies the selected percentage to observed delays. "
+        "It is a planning illustration, not an evaluation of the trained RL model."
     )
     
     if st.button("🔄 Force Sync Live Telemetry", use_container_width=True):
