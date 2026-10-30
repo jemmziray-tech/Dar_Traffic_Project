@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: traffic-collection
@@ -41,9 +42,15 @@ jobs:
           python -m pip install --upgrade pip --quiet
           pip install -r scraper_requirements.txt --quiet
 
+      - name: Authenticate to fresh Google project without a key
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: dar-traffic
+          workload_identity_provider: projects/693791183501/locations/global/workloadIdentityPools/dar-traffic-github/providers/github
+          service_account: dar-traffic-collector@dar-traffic.iam.gserviceaccount.com
+
       - name: Run Scraper
         env:
-          FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: python scrape_traffic.py
 

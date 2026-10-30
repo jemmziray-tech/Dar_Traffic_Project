@@ -7,3 +7,5 @@ __pycache__/
 .streamlit/secrets.toml
 dar_traffic_live.csv
 historical_traffic.csv
+# Temporary credentials created by Google GitHub authentication
+gha-creds-*.json
