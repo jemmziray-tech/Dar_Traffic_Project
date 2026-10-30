@@ -5,13 +5,13 @@ import pytz
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 # Load Environment Variables securely
 load_dotenv()
 from config import ROAD_COORDS, ROAD_PATHS
-from utils import get_db
+from utils import get_db, get_secret, fresh_traffic_frame
 
 # --- 1. Setup Page Config ---
 st.set_page_config(
@@ -55,7 +55,7 @@ def get_live_data():
         )
         row["elevation_val"] = max(row["delay_mins"] * 3, 0.5)
         data.append(row)
-    return pd.DataFrame(data)
+    return fresh_traffic_frame(pd.DataFrame(data))
 
 df_raw = get_live_data()
 tz = pytz.timezone("Africa/Dar_es_Salaam")
@@ -63,7 +63,7 @@ tz = pytz.timezone("Africa/Dar_es_Salaam")
 # --- 4. SIDEBAR: COMMAND CENTER ---
 with st.sidebar:
     st.title(":material/memory: System Core")
-    st.markdown('<div class="blob green"></div> **Live Network Active**', unsafe_allow_html=True)
+    st.write("🟢 Recent traffic data" if not df_raw.empty else "⚪ Waiting for fresh traffic data")
     st.caption(f"Local Time: {datetime.now(tz).strftime('%H:%M %Z')}")
     st.divider()
 
@@ -106,7 +106,7 @@ if not df_raw.empty:
     st.title("Dar es Salaam Traffic Command")
     st.caption("Smart City Digital Twin — Real-Time Infrastructure Intelligence")
     
-    st.write(f"**LIVE NETWORK:** {datetime.now(tz).strftime('%H:%M %Z · %d %b %Y')}")
+    st.write(f"**Last observation:** {pd.to_datetime(df_raw['timestamp'], utc=True).min().tz_convert(tz).strftime('%H:%M %Z · %d %b %Y')}")
     st.divider()
 
     # Premium KPI row natively
@@ -128,7 +128,7 @@ if not df_raw.empty:
     with k4:
         with st.container(border=True):
             friction_str = f"{total_wasted_tzs/1000000:.1f}M TZS" if total_wasted_tzs >= 1000000 else f"{total_wasted_tzs:,.0f} TZS"
-            st.metric("Economic Impact", friction_str, "- Wasted productivity", delta_color="inverse")
+            st.metric("Illustrative Productivity Cost", friction_str, "- Wasted productivity", delta_color="inverse")
 
     st.write("")
 
@@ -180,14 +180,14 @@ if not df_raw.empty:
         st.subheader(":material/smart_toy: AI Executive Briefing")
         with st.container(border=True):
             st.caption("Live macro-summary for logistics & fleet planning.")
-            gemini_key = os.getenv("GEMINI_API_KEY") or (st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None)
+            gemini_key = get_secret("GEMINI_API_KEY")
             if gemini_key:
-                genai.configure(api_key=gemini_key)
+                genai_client = genai.Client(api_key=gemini_key)
                 if st.button("Generate Dispatch Report", type="primary", use_container_width=True):
                     with st.spinner("Analyzing macro-level routing data..."):
                         try:
                             prompt = f"You are a logistics AI for Dar es Salaam. Flow is {efficiency:.1f}%. Worst road is {bottleneck_row['name']} with {bottleneck_row['delay_mins']} min delay. Write a 3-sentence professional executive summary for commercial fleets in native swahili advising them on current conditions. No markdown."
-                            response = genai.GenerativeModel("gemini-2.0-flash").generate_content(prompt)
+                            response = genai_client.models.generate_content(model=get_secret("GEMINI_MODEL", "gemini-3.8-flash"), contents=prompt)
                             st.info(response.text)
                         except Exception as e:
                             st.error(f"AI Error: {e}")
@@ -218,4 +218,4 @@ if not df_raw.empty:
             st.caption(f"+{len(df_sorted)-9} more nodes within nominal thresholds")
 
 else:
-    st.status("Awaiting telemetry uplink...", state="running")
+    st.info("No verified traffic observations from the last 90 minutes. Collection may be paused or unavailable. Refresh after the next scheduled update.")

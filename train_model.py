@@ -16,7 +16,6 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # Scikit-Learn & Advanced ML
-from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import TargetEncoder
@@ -48,34 +47,21 @@ try:
 
     db = firestore.client()
     
-    # 🧹 Auto-Prune Old Data (> 60 days) to save Firestore costs
-    print("🧹 Checking for old telemetry data to prune...")
-    try:
-        prune_date = datetime.now() - timedelta(days=60)
-        old_docs = db.collection("traffic_history").where("timestamp", "<", prune_date).stream()
-        prune_count = 0
-        batch = db.batch()
-        for doc in old_docs:
-            batch.delete(doc.reference)
-            prune_count += 1
-            if prune_count % 400 == 0:
-                batch.commit()
-        if prune_count > 0 and prune_count % 400 != 0:
-            batch.commit()
-        if prune_count > 0:
-            print(f"🗑️ Pruned {prune_count} old records.")
-    except Exception as prune_err:
-        print(f"⚠️ Pruning skipped: {prune_err}")
-
-    docs = list(db.collection("traffic_history").stream())
+    docs = list(db.collection("traffic_history").where("schema_version", "==", 2).stream())
 except Exception as err:
-    print(f"⚠️ Firebase Stream Warning: {err}")
+    raise RuntimeError("Unable to fetch training observations") from err
 
 # Convert database records to a Pandas DataFrame
 df = pd.DataFrame([doc.to_dict() for doc in docs]) if docs else pd.DataFrame()
 
 if df.empty or len(df) < 10:
     print("ℹ️ Limited historical rows in database. Waiting for more data...")
+    sys.exit(0)
+
+# Exclude legacy synthetic data and unknown weather from training.
+df = df[(df["traffic_observed"] == True) & (df["weather"] != "Unknown")].copy()
+if len(df) < 200:
+    print("Waiting for at least 200 validated observations.")
     sys.exit(0)
 
 # Filter the data to ONLY include our target roads
@@ -136,9 +122,15 @@ X = df[features]
 y = df["delay_mins"]
 
 # --- 4. Build the Enterprise Machine Learning Pipeline ---
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+# Hold out the newest timestamps together, preventing future records leaking
+# into evaluation of earlier observations from the same collection run.
+cutoff = df["timestamp"].sort_values().iloc[int(len(df) * 0.8)]
+train_mask = df["timestamp"] < cutoff
+if train_mask.sum() < 100 or (~train_mask).sum() < 20:
+    print("Waiting for more distinct collection timestamps.")
+    sys.exit(0)
+X_train, X_test = X.loc[train_mask], X.loc[~train_mask]
+y_train, y_test = y.loc[train_mask], y.loc[~train_mask]
 
 # 🎯 SAMPLE WEIGHTING: Force the AI to care 5x more about severe gridlocks (>15 mins)
 train_weights = np.where(y_train > 15, 5.0, 1.0)

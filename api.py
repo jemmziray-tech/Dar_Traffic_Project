@@ -2,9 +2,9 @@ import os
 import joblib
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
 # Try importing stable_baselines3 and the custom gym env
@@ -26,7 +26,7 @@ app = FastAPI(title="Dar Traffic AI Engine", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify the actual frontend URL
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -53,14 +53,22 @@ def load_models():
 # --- Schemas ---
 
 class PredictRequest(BaseModel):
-    road_ids: List[str]
-    target_day: str
-    target_time: str
-    target_weather: str
+    road_ids: List[str] = Field(min_length=1, max_length=50)
+    target_day: str = Field(pattern="^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$")
+    target_time: str = Field(pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    target_weather: str = Field(pattern="^(Clear|Cloudy|Rainy)$")
+
+    @field_validator("road_ids")
+    @classmethod
+    def known_roads(cls, values):
+        from config import TARGET_ROADS
+        if len(set(values)) != len(values) or any(v not in TARGET_ROADS for v in values):
+            raise ValueError("Provide unique, supported road IDs")
+        return values
 
 class RlSimRequest(BaseModel):
-    ns_queue: int
-    ew_queue: int
+    ns_queue: int = Field(ge=0, le=100)
+    ew_queue: int = Field(ge=0, le=100)
 
 # --- Helper Functions ---
 DAYS_MAP = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4, "Saturday": 5, "Sunday": 6}
@@ -86,7 +94,7 @@ def build_features_df(road_ids, target_day, target_time, target_weather):
                 "temp_c": 28.0,
                 "is_raining": is_rain,
                 "precipitation_mm": precip,
-                "delay_velocity": 0.0,
+                "previous_delay": 0.0,
             }
             for r_id in road_ids
         ]
@@ -101,7 +109,7 @@ def read_root():
 @app.post("/predict/speed_ceiling")
 def predict_delay(req: PredictRequest):
     """Predicts total traffic delay across a list of road segments."""
-    if not rf_model:
+    if rf_model is None:
         raise HTTPException(status_code=503, detail="XGBoost model is currently offline.")
     
     try:
@@ -126,7 +134,7 @@ def predict_delay(req: PredictRequest):
 @app.post("/rl/simulate")
 def rl_action(req: RlSimRequest):
     """Asks the trained RL Agent what the next optimal light action is."""
-    if not rl_model:
+    if rl_model is None:
         raise HTTPException(status_code=503, detail="RL model is currently offline.")
     
     try:
@@ -143,7 +151,7 @@ def rl_action(req: RlSimRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/data/history")
-def get_history(limit: int = 50):
+def get_history(limit: int = Query(default=50, ge=1, le=500)):
     """Fetches recent traffic telemetry from Firebase."""
     try:
         firebase_secret = os.getenv("FIREBASE_KEY_JSON")
@@ -152,7 +160,7 @@ def get_history(limit: int = 50):
                 cred_dict = json.loads(firebase_secret)
                 cred = credentials.Certificate(cred_dict)
             else:
-                cred = credentials.Certificate("firebase-key.json")
+                cred = credentials.Certificate("firebase-key.json") if os.path.exists("firebase-key.json") else credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
         
         db = firestore.client()

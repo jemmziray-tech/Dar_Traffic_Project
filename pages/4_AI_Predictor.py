@@ -5,8 +5,9 @@ import pytz
 import plotly.express as px
 import streamlit as st
 import joblib
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
+from utils import get_secret
 
 # --- 0. SECURE ENVIRONMENT INITIALIZATION ---
 load_dotenv()
@@ -29,11 +30,9 @@ def load_ml_model():
 
 def init_genai():
     """Initializes Gemini AI using secure environment variables."""
-    gemini_key = os.getenv("GEMINI_API_KEY") or (
-        st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None
-    )
+    gemini_key = get_secret("GEMINI_API_KEY")
     if gemini_key:
-        genai.configure(api_key=gemini_key)
+        genai_client = genai.Client(api_key=gemini_key)
         return True
     return False
 
@@ -71,7 +70,7 @@ def build_features_df(road_ids, target_day, hour_fraction, target_weather):
                 "temp_c": 28.0,
                 "is_raining": is_rain,
                 "precipitation_mm": precip,
-                "delay_velocity": 0.0,
+                "previous_delay": 0.0,
             }
             for r_id in r_list
         ]
@@ -332,9 +331,9 @@ with col_chat:
 
                     try:
                         # Powered by Gemini 2.0 Flash
-                        model = genai.GenerativeModel("gemini-2.0-flash")
+                        client = genai.Client(api_key=get_secret("GEMINI_API_KEY"))
                         full_prompt = system_prompt + "\n\nUser Question: " + prompt
-                        response = model.generate_content(full_prompt)
+                        response = client.models.generate_content(model=get_secret("GEMINI_MODEL", "gemini-3.8-flash"), contents=full_prompt)
 
                         message_placeholder.markdown(response.text)
                         st.session_state.messages.append(

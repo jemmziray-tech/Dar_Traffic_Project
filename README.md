@@ -1,3 +1,7 @@
+> **Restoration status (30 October 2026):** collection and retraining remain paused.
+> See [RESTORATION.md](RESTORATION.md) for the audit, corrected data contract, and restart steps.
+> The historical accuracy and savings figures below describe earlier experiments; they are not validated performance guarantees for the restored system.
+
 # <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6a6/512.gif" width="35" align="center"> Dar es Salaam Traffic Command: AI-Powered Smart City Digital Twin
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/traffic_scraper.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=Scraper%20Status)

@@ -4,6 +4,16 @@ import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+def get_secret(name, default=None):
+    value = os.getenv(name)
+    if value:
+        return value
+    try:
+        return st.secrets.get(name, default)
+    except FileNotFoundError:
+        return default
+
+
 @st.cache_resource
 def get_db():
     """Initializes and returns a singleton Firestore client."""
@@ -13,7 +23,7 @@ def get_db():
             if firebase_secret:
                 # GitHub Actions / local environment variable
                 cred = credentials.Certificate(json.loads(firebase_secret))
-            elif "firebase" in st.secrets:
+            elif get_secret("firebase"):
                 # Streamlit Cloud — reads from st.secrets
                 key_dict = json.loads(st.secrets["firebase"]["key_data"]) if "key_data" in st.secrets["firebase"] else dict(st.secrets["firebase"])
                 cred = credentials.Certificate(key_dict)
@@ -21,8 +31,7 @@ def get_db():
                 # Local development fallback
                 cred = credentials.Certificate("firebase-key.json")
             else:
-                st.error("Authentication failure: No Firebase credentials found.", icon="🔒")
-                st.stop()
+                cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred)
         except Exception as e:
             st.error(f"Failed to connect to Firebase: {e}", icon="⚠️")
@@ -65,3 +74,14 @@ def map_weather(w):
         return "Cloudy"
     else:
         return "Clear"
+
+
+def fresh_traffic_frame(frame, max_age_minutes=90):
+    """Only expose recent, traffic-aware observations from the corrected collector."""
+    import pandas as pd
+    if frame.empty or not {"timestamp", "schema_version", "traffic_observed"}.issubset(frame.columns):
+        return frame.iloc[:0].copy()
+    observed = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
+    age = pd.Timestamp.now(tz="UTC") - observed
+    return frame[(frame["schema_version"] == 2) & (frame["traffic_observed"] == True)
+                 & age.between(pd.Timedelta(0), pd.Timedelta(minutes=max_age_minutes))].copy()
