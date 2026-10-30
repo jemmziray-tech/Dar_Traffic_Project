@@ -1,96 +1,71 @@
-> **Restoration status (30 October 2026):** collection and retraining remain paused.
-> See [RESTORATION.md](RESTORATION.md) for the audit, corrected data contract, and restart steps.
-> The historical accuracy and savings figures below describe earlier experiments; they are not validated performance guarantees for the restored system.
+# Dar Traffic
 
-# <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6a6/512.gif" width="35" align="center"> Dar es Salaam Traffic Command: AI-Powered Smart City Digital Twin
+Traffic observations for 21 configured corridors in Dar es Salaam, Tanzania.
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/traffic_scraper.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=Scraper%20Status)
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jemmziray-tech/Dar_Traffic_Project/retrain_ai.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=AI%20Retraining)
+[Open the dashboard](https://dartrafficproject-johnmziray.streamlit.app/)
 
-![Firebase](https://img.shields.io/badge/Database-Firebase%20Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
-![Google Gemini](https://img.shields.io/badge/GenAI-Google%20Gemini%202.0-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white)
-![XGBoost](https://img.shields.io/badge/ML-XGBoost-blue?style=for-the-badge)
-![Python](https://img.shields.io/badge/Engine-Python%203.10-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Streamlit](https://img.shields.io/badge/Dashboard-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+The collector requests traffic-aware travel estimates from Google Distance Matrix and weather context from Open-Meteo. It writes the latest observation and a history record to Firestore. The Streamlit app reads those records without a service-account key.
 
-### <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f534/512.gif" width="20" align="center"> [Live Dashboard: View the Dar es Salaam Command Center Here](https://dartrafficproject-johnmziray.streamlit.app/)
+## Current scope
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4cc/512.gif" width="28" align="center"> Project Overview
+- View recent corridor travel times, baseline times and additional delay.
+- Search corridors, inspect historical observations and download CSV files.
+- Check collection coverage and missing or stale records.
+- Inspect individual endpoint pairs and open directions in Google Maps.
+- Explore explicitly hypothetical reductions in delay.
 
-Engineered an end-to-end, cloud-native **Data Engineering Pipeline, Predictive Intelligence Dashboard, and AI Copilot** to monitor and forecast real-time traffic congestion and meteorological conditions across major arterial corridors in Dar es Salaam, Tanzania.
+Forecasting is not available: no model has been validated against the fresh database. There is no traffic-signal control, city-wide efficiency score or measured economic-loss estimate.
 
-Going beyond a traditional "Digital Twin," this system not only synchronizes high-resolution time-series data into a NoSQL Cloud Database but leverages that historical telemetry to actively predict urban bottlenecks and optimize commercial fleet logistics using state-of-the-art Machine Learning.
+Collection is **manual-only**. No background collection or training schedule is enabled. The app excludes observations older than 90 minutes from current summaries, so it will show stale data when collection has not run recently.
 
----
+## Run locally
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4e1/512.gif" width="28" align="center"> Live Architecture & Technical Flow
+Use Python 3.11 or later. The dashboard needs no cloud credentials because the two traffic collections allow public reads.
 
-```mermaid
-graph TD
-    subgraph "1. Orchestration & Ingestion"
-        GHA_Scraper[GitHub Actions: Scraper Cron] -->|Concurrent Threads| GMaps[Routing APIs]
-        GHA_Scraper -->|Concurrent Threads| Weather[Open-Meteo API]
-    end
-
-    subgraph "2. Cloud Storage (NoSQL)"
-        GMaps -->|Parsed JSON & Pydantic Validation| FB[(Firebase Firestore)]
-        Weather -->|Parsed JSON| FB
-    end
-
-    subgraph "3. MLOps Pipeline"
-        GHA_ML[GitHub Actions: AI Retraining] -->|Weekly Fetch| FB
-        GHA_ML -->|Trains XGBoost & Saves Model| Repo[GitHub Repo: traffic_model.pkl]
-    end
-
-    subgraph "4. Application & Intelligence"
-        Streamlit[Streamlit Cloud Dashboard] -->|Queries History| FB
-        Streamlit -->|Loads XGBoost| Repo
-        Streamlit -->|Context Injection - Math outputs| Gemini[Google Gemini 2.0 Flash]
-        Gemini -->|Mshauri Fleet Dispatch Advice| Streamlit
-    end
-
-    User((End User)) -->|Views| Streamlit
+```sh
+python -m venv .venv
+# Activate .venv using the command for your shell.
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
 ```
 
-1. **100% Autonomous Pipeline (Zero-Infrastructure):** Data ingestion runs continuously via GitHub Actions using an optimized Cron schedule (running every 30 minutes during active hours) to remain completely free while respecting CI/CD minute limits.
-2. **Data Ingestion & Processing:** A custom Python engine queries routing APIs and the Open-Meteo API, enforcing strict data contracts via `Pydantic`.
-3. **Cloud Storage (Hot & Cold):** Live, processed data is pushed directly to Google Cloud Firestore, instantly updating the frontend while preserving historical snapshots for offline ML training.
-4. **Predictive Machine Learning (XGBoost):** An embedded XGBoost regression model trained on over 1,000 real-world structural vectors (Day, Hour, Precipitation). The model actively predicts Origin-Destination (O-D) route delays with an **R² Confidence Score of 0.96** and a **Mean Absolute Error of ±0.94 minutes**.
-5. **Generative AI Copilot ("Mshauri"):** Integrated Google's Gemini 2.0 Flash LLM natively into the dashboard. Using a deterministic Context Injection strategy, the backend feeds hard mathematical route data to the LLM, which generates hallucination-free, human-readable dispatch advice for logistics operators.
+To run the checks:
 
----
+```sh
+python -m pip install -r requirements-dev.txt
+python -m pytest tests/ -v
+python -m ruff check .
+python -m ruff format --check .
+```
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/2728/512.gif" width="28" align="center"> Key Intelligence Features
+## Repository layout
 
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f916/512.gif" width="22" align="center"> **O-D Routing Engine:** Select an Origin and Destination to get full journey predictions generated by the XGBoost algorithm.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f399/512.gif" width="22" align="center"> **Agentic LLM Copilot:** "Mshauri", a native Gemini 2.0 fleet advisor that explains model predictions in natural language (including fluent Swahili).
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4ca/512.gif" width="22" align="center"> **Enterprise BI Analytics:** Interactive Heatmaps, Unsupervised Spatial Clustering (K-Means), and Cost of Congestion metrics.
-- <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f30d/512.gif" width="22" align="center"> **3D Geospatial Mapping:** Real-time city congestion heatmap utilizing `Pydeck`.
+| File or directory | Purpose |
+| --- | --- |
+| `app.py`, `navigation.py`, `pages/` | Page registration and entry points |
+| `dashboard.py` | Streamlit views and cached database reads |
+| `traffic_data.py` | Record validation, freshness and calculations |
+| `firestore_public.py` | Read-only REST client, restricted to traffic collections |
+| `config.py` | Monitored corridor IDs, names and endpoints |
+| `scrape_traffic.py` | Traffic and weather collection; atomic live/history writes |
+| `firestore.rules` | Public traffic reads; client writes denied |
+| `tests/` | Reader, collector, calculation and page tests |
+| `docs/` | Dashboard behavior and operating instructions |
 
----
+The website, collector and development tools have separate dependency files. Streamlit installs only `requirements.txt`; it does not install machine-learning or Google Cloud administration packages.
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4a1/512.gif" width="28" align="center"> Engineering Milestones
+## Interpreting the data
 
-Building this enterprise-grade pipeline required overcoming real-world engineering hurdles:
-1. **Model Accuracy & R²:** Successfully transitioned from basic Scikit-Learn models to a highly optimized **XGBoost Regressor**, breaching the 1,000 training vector milestone and achieving 96% variance explanation.
-2. **LLM Hallucination Prevention:** Solved generative AI hallucination risks by building a strict "Context Injection" layer that forces the LLM to only interpret the hard math output by the XGBoost model.
-3. **I/O Bottleneck Optimization:** Refactored sequential API calls into asynchronous `ThreadPoolExecutor` processes.
-4. **Smart Cron Scheduling:** Designed a GitHub Actions schedule that aggressively tracks Dar es Salaam traffic during peak hours but sleeps overnight, perfectly circumventing GitHub's 2000-minute free-tier limit.
+Additional delay is `max(traffic time - provider baseline, 0)`. These are provider estimates for specific endpoint pairs, not physical sensor readings. Corridors can overlap. Summing their delays does not measure total time lost by all travellers or congestion across the entire city.
 
----
+The collector calculates delay from provider seconds before rounding durations. The dashboard preserves that delay, subject to a rounding-consistency check. Missing weather remains unknown and never changes the traffic estimate.
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif" width="28" align="center"> Roadmap
+History views read at most the latest 5,000 records across all corridors. Hours without samples remain missing; they are not filled with zeroes or interpolated forecasts.
 
-- [x] **Phase 1:** Migrate from flat CSVs to Cloud NoSQL (Firebase).
-- [x] **Phase 2:** Implement an automated concurrent scraper pipeline.
-- [x] **Phase 3:** Develop an automated MLOps retraining loop and Advanced Analytics Dashboard.
-- [x] **Phase 4:** Scale ML pipeline to **XGBoost** and achieve >0.90 R² accuracy.
-- [x] **Phase 5:** Integrate **Gemini 2.0** for agentic context-injection dispatching.
-- [ ] **Phase 6:** Develop a predictive traffic alerting system via WhatsApp API / Telegram.
+## Operations and development
 
----
+See [operating instructions](docs/OPERATIONS.md) for the Google Cloud project, collector authentication and deployment. [Dashboard behavior](docs/DASHBOARD.md) describes the calculations and limits. [Contributing](CONTRIBUTING.md) covers checks and change conventions.
 
-<p align="center">
-  <b>Built with Love for the Tanzania Developer Community</b><br>
-  <i>Data Engineering & ML Portfolio by John Mziray</i>
-</p>
+Earlier API, modelling and simulation experiments are available in Git history. They are not part of the deployed application and their historical accuracy claims do not describe this version.
+
+Maintained by John Mziray.
