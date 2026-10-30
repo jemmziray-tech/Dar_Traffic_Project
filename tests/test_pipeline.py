@@ -65,3 +65,16 @@ def test_prediction_features_match_training_contract():
     assert result.columns.tolist() == ['road_id', 'hour', 'day_of_week', 'is_weekend',
                                      'is_rush_hour', 'temp_c', 'is_raining',
                                      'precipitation_mm', 'previous_delay']
+
+
+def test_collector_targets_only_fresh_project(monkeypatch):
+    client = MagicMock()
+    maps_client = MagicMock()
+    monkeypatch.setattr(collector.firestore, 'Client', client)
+    monkeypatch.setattr(collector.googlemaps, 'Client', maps_client)
+    monkeypatch.setenv('MAPS_API_KEY', 'test-key')
+    monkeypatch.setenv('FIREBASE_KEY_JSON', '{"project_id":"dar-traffic-command"}')
+    monkeypatch.setenv('GOOGLE_CLOUD_PROJECT', 'dar-traffic-command')
+    collector.initialize_clients()
+    client.assert_called_once_with(project='dar-traffic')
+    maps_client.assert_called_once()

@@ -7,8 +7,7 @@ import pytz
 import numpy as np
 import requests
 import googlemaps
-import firebase_admin
-from firebase_admin import credentials, firestore
+from google.cloud import firestore
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 
@@ -29,13 +28,9 @@ gmaps = None
 def initialize_clients():
     """Connect only when executing, so validation can run without cloud secrets."""
     global db, gmaps
-    secret = os.getenv("FIREBASE_KEY_JSON")
-    if not firebase_admin._apps:
-        cred = (credentials.Certificate(json.loads(secret)) if secret else
-                credentials.Certificate("firebase-key.json") if os.path.exists("firebase-key.json") else
-                credentials.ApplicationDefault())
-        firebase_admin.initialize_app(cred)
-    db = firestore.client()
+    # Use short-lived Application Default Credentials from GitHub federation.
+    # The destination is explicit: never fall back to the old Firebase project.
+    db = firestore.Client(project="dar-traffic")
     key = os.getenv("MAPS_API_KEY")
     if not key or key == "YOUR_GOOGLE_API_KEY_HERE":
         raise RuntimeError("MAPS_API_KEY is required for traffic-aware collection")
