@@ -183,13 +183,14 @@ def history():
     c.metric('Most recent', selected.timestamp.max().tz_convert('Africa/Dar_es_Salaam').strftime('%H:%M EAT'))
     if len(selected) < 2:
         st.info('One observation is a snapshot, not a trend. More collections are needed for a time series.')
-    plot = selected.copy()
-    plot['Time (EAT)'] = plot.timestamp.dt.tz_convert('Africa/Dar_es_Salaam')
-    plot = plot.rename(columns={'live_mins':'Traffic time', 'normal_mins':'Baseline time'})
-    chart(px.scatter(plot, x='Time (EAT)', y=['Traffic time','Baseline time'],
-                     labels={'value':'Travel time (minutes)','variable':'Estimate'},
-                     color_discrete_sequence=[COLOUR,'#7DABEF']))
-    st.caption('Traffic time and baseline are plotted as individual observations; no data is invented between them.')
+    else:
+        plot = selected.copy()
+        plot['Time (EAT)'] = plot.timestamp.dt.tz_convert('Africa/Dar_es_Salaam')
+        plot = plot.rename(columns={'live_mins':'Traffic time', 'normal_mins':'Baseline time'})
+        chart(px.scatter(plot, x='Time (EAT)', y=['Traffic time','Baseline time'],
+                         labels={'value':'Travel time (minutes)','variable':'Estimate'},
+                         color_discrete_sequence=[COLOUR,'#7DABEF']))
+        st.caption('Traffic time and baseline are plotted as individual observations; no data is invented between them.')
     table(selected.sort_values('timestamp', ascending=False))
     download(selected, f'dar-traffic-{road}-history.csv')
 
