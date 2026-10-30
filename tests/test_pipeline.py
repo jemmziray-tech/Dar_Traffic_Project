@@ -55,16 +55,13 @@ def test_old_and_unverified_rows_are_hidden():
     assert fresh_traffic_frame(data)['id'].tolist() == ['fresh']
 
 
-def test_prediction_features_match_training_contract():
-    # Extract the pure feature builder without importing the Streamlit page.
-    module = ast.parse(Path('pages/4_AI_Predictor.py').read_text(encoding='utf-8'))
-    function = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == 'build_features_df')
-    scope = {'pd': pd, 'DAYS_MAP': {'Monday': 0}}
-    exec(compile(ast.Module(body=[function], type_ignores=[]), '<feature builder>', 'exec'), scope)
-    result = scope['build_features_df'](['ubungo'], 'Monday', 8, 'Rainy')
-    assert result.columns.tolist() == ['road_id', 'hour', 'day_of_week', 'is_weekend',
-                                     'is_rush_hour', 'temp_c', 'is_raining',
-                                     'precipitation_mm', 'previous_delay']
+def test_forecasts_cannot_load_unvalidated_legacy_models():
+    source = Path('dashboard.py').read_text(encoding='utf-8')
+    module = ast.parse(source)
+    function = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == 'forecasts')
+    calls = [ast.unparse(n.func) for n in ast.walk(function) if isinstance(n, ast.Call)]
+    assert not any('joblib' in name or 'predict' in name for name in calls)
+    assert 'No validated forecasting model is published' in source
 
 
 def test_collector_targets_only_fresh_project(monkeypatch):
