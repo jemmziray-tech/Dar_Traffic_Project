@@ -49,3 +49,11 @@ Keep the existing Streamlit deployment and its repository/main/app.py configurat
 - Python compilation and diff whitespace checks performed.
 - All seven Streamlit pages started without exceptions with mocked empty Firestore data. This checks startup/empty states, not real credentials or populated analytics.
 - Production deployment and recurring jobs remain pending approval and credential/service validation.
+
+## Verified restoration outcome — 30 October 2026
+
+Following owner approval, PR #1 was merged as 47b6e16198e1dd5f2cd65ba1277846f7864caa88 after GitHub checks passed; main-branch CI also passed. The workflow permits manual collection only, with read-only repository permissions and serialized runs. Recurring triggers and retraining remain paused.
+
+Manual collection [41036391438](https://github.com/jemmziray-tech/Dar_Traffic_Project/actions/runs/41036391438) succeeded at 09:51 UTC / 12:51 EAT. Logs confirm successful weather lookup and Firestore synchronization for all 21 roads. The existing Streamlit dashboard displayed the new observations, and the History page also loaded successfully. Provider access, database writes, deployed code, and dashboard reads are therefore verified for this one run.
+
+Continuous operation, billing/quota configuration, AI briefing responses, predictive model performance, and Maps retention/training permissions remain unverified. Models remain absent pending clean, permitted training data. Without another collection, records will age out of the live display after 90 minutes.
