@@ -271,6 +271,7 @@ def forecasts():
     a,b = st.columns(2)
     a.metric('Fresh-project training observations', len(frame))
     b.metric('Observed calendar days', days)
+    st.caption('Counts cover the latest 5,000 history records, not the entire lifetime of the project.')
     st.subheader('Before a model can be useful')
     st.write('Collect repeated observations across peak and off-peak periods; reserve later dates for evaluation; '
              'compare the model against simple baselines; and publish the error in minutes alongside its coverage. '
