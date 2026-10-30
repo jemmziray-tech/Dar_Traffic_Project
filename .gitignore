@@ -1,11 +1,14 @@
 .env
 firebase-key.json
 __pycache__/
+*.py[cod]
 .pytest_cache/
+.ruff_cache/
 .venv/
 *.egg-info/
 .streamlit/secrets.toml
 dar_traffic_live.csv
 historical_traffic.csv
+historical_traffic_data.csv
 # Temporary credentials created by Google GitHub authentication
 gha-creds-*.json
