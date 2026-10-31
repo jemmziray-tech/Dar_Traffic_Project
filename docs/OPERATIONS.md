@@ -150,7 +150,7 @@ Resume with `gcloud scheduler jobs resume` using the same arguments. Pausing the
 
 
 
-The dashboard reads `live_traffic` and the per-day `daily_history` summaries through Firestore REST. Rules deny client writes and access to all other collections, including the lease, and reject public list queries without a small limit (50 live, 31 days, 100 raw history records). Authorized collector writes use IAM. Editing `firestore.rules` does not deploy it automatically; deploy it with `firebase deploy --only firestore:rules --project dar-traffic`.
+The dashboard reads `live_traffic` and the per-day `daily_history` summaries through Firestore REST. Rules deny client writes and access to all other collections, including the lease, and reject public list queries without a small limit (50 live, 31 days, 100 raw history records). Authorized collector writes use IAM. Editing `firestore.rules` or `firestore.indexes.json` does not deploy them automatically; deploy both with `firebase deploy --only firestore --project dar-traffic`. The History page needs the `daily_history` index (document ID, descending), so deploy rules and indexes before merging website changes that depend on them.
 
 The collector sets `expire_at` 30 days ahead on `traffic_history` and `daily_history` documents (`RETENTION_DAYS` in `scrape_traffic.py`). The `prepare` phase enables Firestore TTL deletion on that field; deletion usually happens within a day of expiry. Confirm the retention period against the current Google Maps Platform terms before raising it. Set a billing budget alert on the project so unexpected read or Maps costs are noticed.
 
