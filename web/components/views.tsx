@@ -840,8 +840,8 @@ export function History() {
       <div className="trust-note">
         <Database size={17} />
         <p>
-          History queries include at most the latest 5,000 records across all
-          corridors. Older observations may fall outside this window.
+          History covers up to the last 31 days of stored observations. Older
+          observations are deleted after 30 days.
         </p>
       </div>
     </>

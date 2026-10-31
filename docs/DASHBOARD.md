@@ -6,7 +6,7 @@ The public website is [Dar Traffic](https://dartraffic.vercel.app/). It uses the
 | --- | --- | --- |
 | Overview | Recent coverage, median and largest extra delay, corridor search, saved roads, sorting and CSV export | Current summaries exclude observations older than 90 minutes; no city-wide efficiency or economic-loss score |
 | Corridors | Traffic time, provider baseline, endpoint coordinates and a Google Maps directions link | Each reading belongs to one configured endpoint pair, not a complete journey |
-| History | Corridor and period selectors, observed travel-time points, underlying records and CSV | Latest 5,000 history documents across all corridors; no interpolation or forecast |
+| History | Corridor and period selectors, observed travel-time points, underlying records and CSV | Up to 31 daily summary documents (observations are kept 30 days); no interpolation or forecast |
 | Data status | Recent, stale and missing corridors, timestamps and collection window | A stored snapshot does not prove that the scheduler is healthy |
 | About | Sources, calculations, coverage limits and model requirements | No validated prediction model is published |
 
@@ -16,7 +16,7 @@ Only schema 2 Google Distance Matrix observations with traffic explicitly observ
 
 Extra delay is `max(traffic time - baseline, 0)`. Zero does not prove a road is empty. Corridors can overlap, so their delays cannot measure total person-minutes or congestion across the whole city.
 
-Live reads are cached for one minute and history for five minutes. The website refreshes stored live observations each minute while visible. Refresh never starts a paid Maps request. Saved roads stay in the visitor's browser; no account is required. CSV exports contain the selected records with UTC timestamps; on-screen observation times use Tanzania time.
+Live and history reads are cached for five minutes. The website checks for new live observations every five minutes while visible. Refresh never starts a paid Maps request. Saved roads stay in the visitor's browser; no account is required. CSV exports contain the selected records with UTC timestamps; on-screen observation times use Tanzania time.
 
 ## Verification
 
