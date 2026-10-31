@@ -1,6 +1,6 @@
 # Dar Traffic website
 
-A small, read-only website for the 21 monitored corridors in Dar es Salaam. It reads the same Firestore observations as the Streamlit dashboard. Opening or refreshing the website does not call the paid Maps API.
+A small, read-only website for the 21 monitored corridors in Dar es Salaam. It reads the Google-collected Firestore observations. The former Streamlit address now serves a moved notice. Opening or refreshing the website does not call the paid Maps API.
 
 The overview lets people search and save corridors. Each corridor has its own travel-time reading, baseline, measured endpoints and Google Maps link. History shows stored observations as individual points, with a CSV download. Data status explains missing and stale readings.
 
@@ -32,7 +32,7 @@ flowchart LR
     Weather[Open-Meteo weather] --> Collector
     Collector --> Firestore[(Firestore)]
     Firestore --> Website[Next.js website]
-    Firestore --> Streamlit[Streamlit dashboard]
+    Streamlit[Old Streamlit address] --> Website
 ```
 
 Collection runs every half-hour from 06:00 to 22:30 Tanzania time. The website refreshes stored readings every minute while its tab is visible. It treats observations older than 90 minutes as stale and does not substitute simulated data when the feed is unavailable.

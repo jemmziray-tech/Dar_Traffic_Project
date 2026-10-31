@@ -1,5 +1,3 @@
-import ast
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -137,17 +135,6 @@ def test_success_writes_live_and_history_atomically(monkeypatch):
     )
     assert db.batch.return_value.set.call_count == 2
     db.batch.return_value.commit.assert_called_once()
-
-
-def test_forecasts_cannot_load_unvalidated_legacy_models():
-    source = Path("dashboard.py").read_text(encoding="utf-8")
-    module = ast.parse(source)
-    function = next(
-        n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == "forecasts"
-    )
-    calls = [ast.unparse(n.func) for n in ast.walk(function) if isinstance(n, ast.Call)]
-    assert not any("joblib" in name or "predict" in name for name in calls)
-    assert "No validated forecasting model is published" in source
 
 
 def test_collector_targets_only_fresh_project(monkeypatch):
