@@ -5,3 +5,4 @@ out/
 *.tsbuildinfo
 .env*
 .openai/workflow-metrics.jsonl
+.vercel/

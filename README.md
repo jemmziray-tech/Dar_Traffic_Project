@@ -2,7 +2,7 @@
 
 Traffic observations for 21 configured corridors in Dar es Salaam, Tanzania.
 
-[Open Dar Traffic](https://dar-traffic.justolm128.chatgpt.site/)
+[Open Dar Traffic](https://dartraffic.vercel.app/)
 
 The collector requests traffic-aware travel estimates from Google Distance Matrix and weather context from Open-Meteo. It writes the latest observation and a history record to Firestore. The Next.js website reads those records without a service-account key. The old Streamlit address now points visitors to the new website.
 
@@ -43,7 +43,7 @@ flowchart TD
     Maps[Google Maps Platform: Distance Matrix] -->|Traffic estimates| Job
     Weather[Open-Meteo] -->|Weather context| Job
 
-    subgraph Website[Next.js website: Sites static hosting]
+    subgraph Website[Next.js website: Vercel hosting]
         Reader[Read-only Firestore REST client] --> Validation[Source, value and freshness checks]
         Validation --> Pages[Overview, corridors, history, data status and about]
     end

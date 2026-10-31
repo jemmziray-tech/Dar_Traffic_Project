@@ -26,7 +26,7 @@ Google Cloud project: `dar-traffic` (`693791183501`).
 
 | Firestore database | `(default)`, `africa-south1` |
 
-| Website | https://dar-traffic.justolm128.chatgpt.site/ — Next.js static export on Sites |
+| Website | https://dartraffic.vercel.app/ — Next.js static export on Vercel |
 
 | Old address | Streamlit Community Cloud, `main`, `app.py` — moved notice only |
 
@@ -170,7 +170,7 @@ The standard [Google Maps terms, section 3.2.3(c)](https://cloud.google.com/maps
 
 
 
-Website source is in `web/`. Its GitHub check installs locked dependencies, runs the data tests and TypeScript checks, then builds the static export. Test a release with real read-only observations before publishing its `out/` directory. GitHub does not automatically deploy the website. The public release is hosted on Sites; keep its existing project identity when using the Sites publishing workflow.
+Website source is in `web/`. Its GitHub check installs locked dependencies, runs the data tests and TypeScript checks, then builds the static export. Test a release with real read-only observations before publishing its `out/` directory. Vercel project `dartraffic`, in the `jemmziray-techs-projects` team, builds the repository's `web/` directory with Node.js 24. Its Git integration deploys pushes to `main` and creates previews for other branches. Keep the Next.js output-directory override unset; Vercel detects the static export automatically. The production website is public, while preview deployments retain Vercel authentication.
 
 
 
