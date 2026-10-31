@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-WEBSITE = "https://dar-traffic.justolm128.chatgpt.site/"
+WEBSITE = "https://dartraffic.vercel.app/"
 LEGACY_ROUTES = (
     "Overview",
     "History",

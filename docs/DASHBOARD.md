@@ -1,6 +1,6 @@
 # Website behavior
 
-The public website is [Dar Traffic](https://dar-traffic.justolm128.chatgpt.site/). It uses the read-only `dar-traffic` Firestore feed.
+The public website is [Dar Traffic](https://dartraffic.vercel.app/). It uses the read-only `dar-traffic` Firestore feed.
 
 | View | Capability | Limit |
 | --- | --- | --- |

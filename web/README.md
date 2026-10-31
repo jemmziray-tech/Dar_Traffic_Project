@@ -42,3 +42,11 @@ The public Firestore interface allows reads from `live_traffic` and `traffic_his
 Extra delay is the positive difference between Google's traffic estimate and its baseline. It is not a city-wide congestion score. The website does not predict traffic or claim that a zero-delay estimate means an empty road. Any future model needs suitable training rights and independent validation.
 
 The existing backend and deployment documentation remain in the parent project. This frontend does not create or change collection schedules.
+
+## Vercel hosting
+
+Public website: https://dartraffic.vercel.app/
+
+The Vercel project is `dartraffic`, with repository root directory `web`, Next.js framework detection, Node.js 24, `npm ci` for installation and `npm run build` for the build. Leave the output-directory override unset. Vercel handles the static export automatically; pointing its Next.js builder directly at `out/` causes a missing routes-manifest error.
+
+The Git integration publishes `main` to production and creates protected branch previews. Traffic collection stays in Google Cloud; this website needs no Maps key or service-account credentials.
