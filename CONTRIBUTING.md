@@ -18,4 +18,4 @@ Keep public page URLs stable. The route registry in `navigation.py` maps the cur
 
 Do not commit credentials, downloaded data, compiled Python files or generated models. Dependency files contain direct requirements for each component; include transitive packages only when the code imports them directly.
 
-The collector workflow is a production operation. Do not change its approved schedule or run additional collection as part of CI. Changes to collection frequency require agreement on usage and cost.
+The Google Cloud collector is a production operation. Do not change its approved schedule or run additional collection as part of CI. Changes to collection frequency require agreement on usage and cost.

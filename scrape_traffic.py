@@ -4,6 +4,8 @@ import concurrent.futures
 import logging
 import math
 import os
+import uuid
+from datetime import datetime, timedelta, timezone
 
 import googlemaps
 import requests
@@ -169,20 +171,67 @@ def collect_road(road, weather_info):
         return False
 
 
+def claim_collection(now=None):
+    """Allow one execution per half-hour slot, with a lease against overlap."""
+    now = now or datetime.now(timezone.utc)
+    slot = int(now.timestamp()) // 1800
+    owner = uuid.uuid4().hex
+    reference = db.collection("_collector_state").document("collection")
+
+    @firestore.transactional
+    def claim(transaction):
+        state = reference.get(transaction=transaction).to_dict() or {}
+        if state.get("slot") == slot or state.get("lease_until", now) > now:
+            return None
+        transaction.set(
+            reference,
+            {
+                "slot": slot,
+                "owner": owner,
+                "started_at": now,
+                "lease_until": now + timedelta(minutes=10),
+            },
+        )
+        return owner
+
+    return claim(db.transaction())
+
+
+def release_collection(owner):
+    reference = db.collection("_collector_state").document("collection")
+
+    @firestore.transactional
+    def release(transaction):
+        state = reference.get(transaction=transaction).to_dict() or {}
+        if state.get("owner") == owner:
+            transaction.update(reference, {"lease_until": datetime.now(timezone.utc)})
+
+    release(db.transaction())
+
+
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     initialize_clients()
-    weather = get_weather_for_all_roads(ROADS)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        results = list(
-            executor.map(
-                lambda road: collect_road(road, weather.get(road["id"], ("Unknown", None))),
-                ROADS,
-            )
+    owner = claim_collection()
+    if not owner:
+        logger.info(
+            "Collection skipped: this slot was already started or another run holds the lease"
         )
-    succeeded = sum(results)
-    logger.info("Collection complete: %s/%s roads", succeeded, len(ROADS))
-    return 0 if succeeded == len(ROADS) else 1
+        return 0
+    try:
+        weather = get_weather_for_all_roads(ROADS)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(
+                executor.map(
+                    lambda road: collect_road(road, weather.get(road["id"], ("Unknown", None))),
+                    ROADS,
+                )
+            )
+        succeeded = sum(results)
+        logger.info("Collection complete: %s/%s roads", succeeded, len(ROADS))
+        return 0 if succeeded == len(ROADS) else 1
+    finally:
+        release_collection(owner)
 
 
 if __name__ == "__main__":

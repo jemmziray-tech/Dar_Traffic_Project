@@ -16,7 +16,7 @@ The collector requests traffic-aware travel estimates from Google Distance Matri
 
 Forecasting is not available: no model has been validated against the fresh database. There is no traffic-signal control, city-wide efficiency score or measured economic-loss estimate.
 
-Collection runs **every 30 minutes, 06:00-22:30 EAT**, with a manual trigger available when needed. This is 34 scheduled runs, or 714 routing elements for 21 corridors, per day before retries. Model training is not enabled. The app excludes observations older than 90 minutes from current summaries, so it will show stale data when collection has not run recently.
+Google Cloud Scheduler starts a Cloud Run Job **every 30 minutes, 06:00-22:30 EAT**. GitHub hosts the code and runs tests; it no longer runs collection. This is 34 scheduled runs, or 714 routing elements for 21 corridors, per day before retries. Model training is not enabled. The app excludes observations older than 90 minutes from current summaries, so it will show stale data when collection has not run recently.
 
 ## Architecture
 
@@ -24,58 +24,44 @@ The project has two parts: a collector that writes observations, and a website t
 
 ```mermaid
 flowchart TD
-    Schedule[Every 30 minutes: 06:00-22:30 EAT] --> Workflow
-    Maintainer[Maintainer] -->|Optional manual run| Workflow
-
-    subgraph GitHub[GitHub repository and Actions]
-        Workflow[Collect traffic workflow]
-        Collector[Python collector]
-        Secret[Maps API key secret]
-        Code[Code changes]
-        Checks[Tests, lint and formatting]
-        Main[main branch]
-        Workflow --> Collector
-        Secret --> Collector
-        Code --> Checks
-        Checks -->|Merge reviewed changes| Main
-    end
+    Repository[GitHub repository] --> Checks[Tests, lint and formatting]
+    Repository -->|Release collector source| Build
+    Maintainer[Maintainer using Google Cloud CLI] -->|Deploy a tested release| Build
 
     subgraph Google[Google Cloud: dar-traffic]
-        Identity[Workload Identity Federation]
-        Account[Collector service account]
-        Live[(Firestore: live_traffic)]
-        History[(Firestore: traffic_history)]
-        Identity --> Account
+        Build[Cloud Build: Johannesburg] --> Registry[Artifact Registry: collector image]
+        Registry --> Job[Cloud Run Job: dar-traffic-collector]
+        Scheduler[Cloud Scheduler: 06:00-22:30 EAT] -->|Authenticated run request| Job
+        Invoker[Scheduler service account] -.->|Invoke this job only| Scheduler
+        Runtime[Collector service account] -.->|Firestore and secret access| Job
+        Secret[Secret Manager: restricted Maps key] --> Job
+        Job -->|Atomic write per corridor| Live[(Firestore: live_traffic)]
+        Job -->|Same batch| History[(Firestore: traffic_history)]
+        Job --> Lease[(Private collection lease)]
     end
 
-    Workflow -.->|GitHub OIDC identity| Identity
-    Account -.->|Short-lived credentials for Firestore| Collector
-    Maps[Google Maps Platform: Distance Matrix] -->|Traffic time, baseline and distance| Collector
-    Weather[Open-Meteo] -->|Weather context| Collector
-    Collector -->|Atomic write per corridor| Live
-    Collector -->|Same batch| History
+    Maps[Google Maps Platform: Distance Matrix] -->|Traffic estimates| Job
+    Weather[Open-Meteo] -->|Weather context| Job
 
     subgraph Website[Streamlit Community Cloud]
-        Reader[Read-only Firestore REST client]
-        Validation[Source, value and freshness checks]
-        Pages[Seven dashboard views]
-        Reader --> Validation --> Pages
+        Reader[Read-only Firestore REST client] --> Validation[Source, value and freshness checks]
+        Validation --> Pages[Seven dashboard views]
     end
 
-    Main -->|Deploy app.py| Website
+    Repository -->|Deploy app.py from main| Website
     Live -->|Public reads, no client writes| Reader
-    History -->|Latest 5,000 history records| Reader
+    History -->|Latest 5,000 records| Reader
     Pages --> Visitors[Dashboard visitors]
 ```
 
 ### How an observation reaches the dashboard
 
-1. The schedule starts the collection workflow, or a maintainer starts an additional manual run. GitHub uses Workload Identity Federation to obtain short-lived Google Cloud credentials; there is no downloaded service-account key.
+1. Cloud Scheduler calls the Cloud Run Jobs API using its own service account. That account can invoke only the collector job. The container uses its attached service account for Firestore and Secret Manager; there is no downloaded service-account key.
 2. The collector requests traffic estimates for the endpoint pairs in `config.py`. Open-Meteo supplies weather context, which does not alter the traffic measurements.
-3. Each successful corridor is written to the live and history collections in one Firestore batch. A failed request leaves the previous live observation intact and makes the workflow report a failure.
+3. Each successful corridor is written to the live and history collections in one Firestore batch. A failed request leaves the previous live observation intact and makes the job report a failure.
 4. Streamlit reads the two collections through the public REST API. It checks the source, values and timestamps before displaying them. Current summaries exclude stale records; historical views retain their timestamps.
 
-The Maps API key and Google Cloud credentials serve different purposes. The key authorizes Maps requests. The federated service account authorizes Firestore writes. The public website uses neither credential.
+The Maps API key and Google Cloud credentials serve different purposes. The restricted key in Secret Manager authorizes Maps requests. The attached collector service account authorizes Firestore writes. The public website uses neither credential. A transactional lease prevents overlapping executions and a second collection in the same half-hour slot.
 
 ### What is not in the live architecture
 
@@ -112,7 +98,8 @@ python -m ruff format --check .
 | `traffic_data.py` | Record validation, freshness and calculations |
 | `firestore_public.py` | Read-only REST client, restricted to traffic collections |
 | `config.py` | Monitored corridor IDs, names and endpoints |
-| `scrape_traffic.py` | Traffic and weather collection; atomic live/history writes |
+| `scrape_traffic.py` | Traffic collection, duplicate-run protection and atomic writes |
+| `Dockerfile.collector`, `cloudbuild.collector.yaml`, `scripts/` | Google-hosted collector build and deployment |
 | `firestore.rules` | Public traffic reads; client writes denied |
 | `tests/` | Reader, collector, calculation and page tests |
 | `docs/` | Dashboard behavior and operating instructions |

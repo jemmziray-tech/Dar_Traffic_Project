@@ -513,11 +513,11 @@ def data_status():
     st.subheader("Collection and model controls")
     st.write(
         "This dashboard cannot start collection, change schedules or publish models. "
-        "Check GitHub Actions for the actual collector status. A recent record alone does not prove that recurring collection is enabled."
+        "Check Google Cloud Run executions and Cloud Scheduler for collector status. A recent record alone does not prove that recurring collection is enabled."
     )
     st.link_button(
-        "View collector runs ↗",
-        "https://github.com/jemmziray-tech/Dar_Traffic_Project/actions/workflows/traffic_scraper.yml",
+        "View Google Cloud collector executions ↗",
+        "https://console.cloud.google.com/run/jobs?project=dar-traffic",
     )
     st.caption(
         "Public traffic reads may incur Firestore read charges. History queries are bounded to 5,000 records and cached for five minutes."

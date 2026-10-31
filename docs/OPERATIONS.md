@@ -2,48 +2,81 @@
 
 ## Services
 
-- Google Cloud project: `dar-traffic` (project number `693791183501`).
-- Firestore database: `(default)`, located in `africa-south1`.
-- Collections: `live_traffic` and `traffic_history`.
-- Website: Streamlit Community Cloud, repository `main`, entry point `app.py`.
-- Traffic provider: Google Distance Matrix. Weather context: [Open-Meteo](https://open-meteo.com/en/docs).
+Google Cloud project: `dar-traffic` (`693791183501`).
 
-The old `dar-traffic-command` Firebase project is not used by the current application. No data is copied from it.
+| Resource | Name / location |
+| --- | --- |
+| Cloud Run Job | `dar-traffic-collector`, `africa-south1` (Johannesburg) |
+| Cloud Scheduler | `dar-traffic-collector`, `europe-west1` |
+| Container registry | `africa-south1-docker.pkg.dev/dar-traffic/dar-traffic/collector` |
+| Cloud Build source bucket | `dar-traffic-build-source-693791183501` |
+| Maps credential | Secret Manager secret `dar-traffic-maps-api-key` |
+| Firestore database | `(default)`, `africa-south1` |
+| Website | Streamlit Community Cloud, `main`, entry point `app.py` |
 
-## Collector
+Cloud Scheduler uses `0,30 6-22 * * *` in `Africa/Dar_es_Salaam`: 34 runs per day, from 06:00 through 22:30 EAT. At 21 corridors this is 714 routing elements/day before provider retries. Google schedules are not a hard real-time guarantee. GitHub Actions runs tests only, not collection.
 
-The `Collect traffic` workflow in `.github/workflows/traffic_scraper.yml` runs every 30 minutes from 06:00 through 22:30 EAT. The cron expression `0,30 3-19 * * *` is interpreted in UTC. This schedules 34 runs/day and 714 routing elements/day for 21 corridors before retries. A manual trigger is also available for additional runs. GitHub schedules can be delayed; this is not an exact-time service. Running it makes billable Maps requests and writes observations. Do not use a workflow run as a routine health check.
+The scheduler's region is separate from the job's region: it makes an authenticated API request, while the collector container and Firestore run in Johannesburg. The old `dar-traffic-command` database is not used.
 
-GitHub Actions authenticates through Workload Identity Federation:
+## Identities and credentials
 
-- Pool: `dar-traffic-github`; provider: `github`.
-- Service account: `dar-traffic-collector@dar-traffic.iam.gserviceaccount.com`.
-- Google Cloud project is explicit in the collector; ambient project settings do not change the destination.
-- The repository secret `MAPS_API_KEY` supplies the Maps credential. No Firebase JSON key is needed.
+- `dar-traffic-collector@dar-traffic.iam.gserviceaccount.com`: existing Firestore data access, plus Secret Accessor on the Maps secret only.
+- `dar-traffic-scheduler@dar-traffic.iam.gserviceaccount.com`: Cloud Run Invoker on this job only. No Firestore or secret access.
+- `dar-traffic-build@dar-traffic.iam.gserviceaccount.com`: writer on the container repository, reader on the source bucket, and project logging/service-usage permissions. No traffic data or Maps secret access.
 
-The provider trust is restricted to this repository, `main`, and the collector workflow. The service account has Firestore data access; the matching repository identity has permission to impersonate that account. Changing the workflow path requires reviewing the provider trust condition.
+The dedicated Maps key is restricted to the Distance Matrix API and stored in Secret Manager. There are no service-account JSON keys. GitHub federation is retired from collection. Never put credentials in the repository or copy secret values into logs.
 
-A run collects each configured corridor with up to five concurrent workers. Every successful corridor is written to the live and history collections in one batch. A failed corridor retains its previous live record. The workflow exits unsuccessfully if any corridor failed, even if others succeeded. Weather failure does not fabricate weather and does not stop valid traffic collection.
+## Deploying a collector change
 
-For local collector development, install `scraper_requirements.txt` and use your normal Google Cloud Application Default Credentials plus the `MAPS_API_KEY` environment variable. Running `python scrape_traffic.py` performs a real collection; importing the module does not initialize clients or collect data.
+Use Google Cloud CLI with an authorized project administrator account. Run the tests and style checks before releasing. From the repository root:
 
-## Website and access
+```sh
+python scripts/deploy_collector.py prepare
+python scripts/deploy_collector.py build
+```
 
-The dashboard reads Firestore through an unauthenticated REST client restricted in code to the two traffic collections. The deployed rules allow public reads of those records and deny client writes and other collection access. Authorized collector writes use IAM independently of client rules. The rule source is `firestore.rules`; changing this file alone does not deploy the rules.
+`prepare` enables the required APIs and creates or reuses the named resources and scoped permissions. `build` uploads only an explicit allowlist of collector source files and prints the Cloud Build ID and content-tagged image. It does not upload local configuration or credentials.
 
-Public reads can incur Firestore charges. Live reads are cached for one minute and history reads for five minutes. Refresh clears read caches only. It cannot call Maps, write observations or alter collection schedules.
+Wait for the build to succeed, then deploy the image:
 
-To deploy code, merge tested changes to `main`. Keep Streamlit configured to `app.py`; use Python 3.11 or later for a new deployment. No dashboard secret is required. If old Firebase or Gemini secrets remain in Streamlit, the current application does not read them.
+```sh
+python scripts/deploy_collector.py deploy
+```
 
-## Routine checks
+Deployment does not start collection or enable a new scheduler. A manual test is a production operation that can make billable Maps requests:
 
-1. Check the latest collector run for `Collection complete: 21/21 roads` and a successful result.
-2. Inspect **Data status** for recent, stale and missing corridors. A successful run does not imply that a schedule is enabled.
-3. Compare the observation timestamp with the intended collection time. Public pages use EAT (UTC+3); storage timestamps are UTC.
-4. Review Maps usage, Firestore reads and billing in Google Cloud separately. The dashboard does not report quotas or account health.
+```sh
+gcloud run jobs execute dar-traffic-collector --project=dar-traffic --region=africa-south1 --wait
+```
 
-If the database cannot be reached, the app shows an unavailable state. If observations are older than 90 minutes, current summaries are withheld; historical views still work. Do not substitute fabricated observations to hide these states.
+After the job is verified, create or update its schedule:
 
-## Future work
+```sh
+python scripts/deploy_collector.py schedule
+```
 
-The recurring cadence was enabled with the owner’s approval. Changing it or adding manual runs changes usage and charges. Review provider retention and use requirements before expanding storage. The standard [Google Maps terms, section 3.2.3(c)](https://cloud.google.com/maps-platform/terms) prohibit training, testing or validating models with Maps content. Obtain suitable rights or a separate dataset licensed for modelling before building a training pipeline. Then collect an appropriate history, evaluate on later dates against simple baselines, and publish error in minutes with coverage. Earlier training scripts and simulations were removed from the active tree because they do not meet the fresh-project contract; they remain in Git history.
+Do not add a GitHub collection timer. Additional manual runs and changes to the cadence alter usage and charges. Cloud Run, Scheduler, builds, container storage, Secret Manager, Maps and Firestore have separate usage charges.
+
+## Execution behavior
+
+The job has one task, 1 CPU, 512 MiB memory, an eight-minute timeout and no task retries. The scheduler has no automatic retry attempts. A private `_collector_state/collection` record uses a Firestore transaction to prevent overlapping runs and a second collection in the same UTC half-hour slot. A ten-minute lease expires after a crashed or timed-out container. A repeated invocation in the same slot exits without contacting providers, including after a partial failure; the next scheduled slot can collect again.
+
+Each successful corridor is written to `live_traffic` and `traffic_history` in one batch. Failures retain the previous live record and make the job fail if any corridor failed. Missing or mismatched weather stays unknown and does not alter traffic estimates.
+
+To pause collection:
+
+```sh
+gcloud scheduler jobs pause dar-traffic-collector --location=europe-west1 --project=dar-traffic
+```
+
+Resume with `gcloud scheduler jobs resume` using the same arguments. Pausing the timer does not cancel an already-started Cloud Run execution.
+
+## Website and monitoring
+
+The dashboard reads the two public traffic collections through Firestore REST. Rules deny client writes and access to all other collections, including the lease. Authorized collector writes use IAM. Editing `firestore.rules` does not deploy it automatically.
+
+Live reads are cached for one minute and history for five minutes. Refresh clears read caches; it cannot collect traffic or change schedules. Current summaries exclude observations older than 90 minutes. Historical views read at most the 5,000 newest records.
+
+Check Cloud Run executions for `Collection complete: 21/21 roads`, then inspect Data status for freshness and missing corridors. Check Cloud Scheduler's last result separately to verify trigger delivery. A successful trigger means a run was requested, not that collection completed. Review billing and quotas in Google Cloud; the website does not report account health.
+
+The standard [Google Maps terms, section 3.2.3(c)](https://cloud.google.com/maps-platform/terms) prohibit using Maps content to train, test or validate models. A future training pipeline needs suitable rights or a separate modelling dataset and evaluation on later dates. No automatic model training is deployed.
