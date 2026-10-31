@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   csv,
+  dailyObservations,
   directions,
   FRESH_MS,
   isFresh,
@@ -97,4 +98,22 @@ test("directions use the selected corridor’s actual endpoints", () => {
   assert.equal(url.hostname, "www.google.com");
   assert.equal(url.searchParams.get("origin"), ROADS[0].start);
   assert.equal(url.searchParams.get("destination"), ROADS[0].end);
+});
+
+test("daily summaries expand into individually validated observations", () => {
+  const day: FirestoreDocument = {
+    fields: {
+      observations: {
+        arrayValue: {
+          values: [
+            { mapValue: document() },
+            { mapValue: document({ source: { stringValue: "simulation" } }) },
+          ],
+        },
+      },
+    },
+  };
+  const records = normalize(dailyObservations([day, {}]), now);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].roadId, ROADS[0].id);
 });

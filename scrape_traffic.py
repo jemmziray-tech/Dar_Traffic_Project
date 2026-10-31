@@ -15,6 +15,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from config import ROADS
 
 logger = logging.getLogger(__name__)
+EAT = timezone(timedelta(hours=3), "EAT")  # Tanzania has no daylight saving
+# Stored observations expire through a Firestore TTL policy on `expire_at`.
+# Confirm this period against the current Google Maps Platform terms.
+RETENTION_DAYS = 30
 db = None
 gmaps = None
 
@@ -22,7 +26,7 @@ gmaps = None
 def initialize_clients():
     """Connect only when executing, so validation can run without cloud secrets."""
     global db, gmaps
-    # Use short-lived Application Default Credentials from GitHub federation.
+    # Use the Cloud Run job's attached service account (Application Default Credentials).
     # The destination is explicit: never fall back to the old Firebase project.
     db = firestore.Client(project="dar-traffic")
     key = os.getenv("MAPS_API_KEY")
@@ -159,10 +163,27 @@ def collect_road(road, weather_info):
             weather=weather,
             precipitation_mm=precip_mm,
         ).model_dump()
-        validated["timestamp"] = firestore.SERVER_TIMESTAMP
+        observed_at = datetime.now(timezone.utc)
+        expire_at = observed_at + timedelta(days=RETENTION_DAYS)
         batch = db.batch()
-        batch.set(db.collection("live_traffic").document(road["id"]), validated)
-        batch.set(db.collection("traffic_history").document(), validated)
+        batch.set(
+            db.collection("live_traffic").document(road["id"]),
+            {**validated, "timestamp": firestore.SERVER_TIMESTAMP},
+        )
+        batch.set(
+            db.collection("traffic_history").document(),
+            {**validated, "timestamp": firestore.SERVER_TIMESTAMP, "expire_at": expire_at},
+        )
+        # One document per Tanzania calendar day lets the website read a week of
+        # history in 7 document reads instead of thousands.
+        batch.set(
+            db.collection("daily_history").document(observed_at.astimezone(EAT).date().isoformat()),
+            {
+                "observations": firestore.ArrayUnion([{**validated, "timestamp": observed_at}]),
+                "expire_at": expire_at,
+            },
+            merge=True,
+        )
         batch.commit()
         logger.info("Synced %s: delay %.2f minutes", road["id"], delay)
         return True

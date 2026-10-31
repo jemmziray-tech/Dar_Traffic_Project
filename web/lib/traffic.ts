@@ -170,13 +170,30 @@ const endpoint =
   "https://firestore.googleapis.com/v1/projects/dar-traffic/databases/(default)/documents:runQuery";
 const cache = new Map<string, { at: number; records: Observation[] }>();
 const pending = new Map<string, Promise<Observation[]>>();
+/** Expand `daily_history` documents into the observations stored in each day. */
+export function dailyObservations(
+  documents: FirestoreDocument[],
+): FirestoreDocument[] {
+  return documents.flatMap((document) => {
+    const array = document.fields?.observations?.arrayValue as
+      | { values?: { mapValue?: FirestoreDocument }[] }
+      | undefined;
+    return (array?.values ?? []).flatMap((value) =>
+      value.mapValue ? [value.mapValue] : [],
+    );
+  });
+}
+
 export async function readTraffic(
   history = false,
   force = false,
 ): Promise<Observation[]> {
-  const collection = history ? "traffic_history" : "live_traffic";
+  // History reads one summary document per day (at most 31), not raw records.
+  const collection = history ? "daily_history" : "live_traffic";
   const cached = cache.get(collection);
-  if (!force && cached && Date.now() - cached.at < (history ? 300000 : 60000))
+  // Collection runs every 30 minutes, so a five-minute cache keeps the clock
+  // ticking each minute without re-reading Firestore each minute.
+  if (!force && cached && Date.now() - cached.at < 300000)
     return cached.records;
   if (pending.has(collection)) return pending.get(collection)!;
   const promise = (async () => {
@@ -185,11 +202,11 @@ export async function readTraffic(
     try {
       const structuredQuery = {
         from: [{ collectionId: collection }],
-        limit: history ? 5000 : 100,
+        limit: history ? 31 : 50,
         ...(history
           ? {
               orderBy: [
-                { field: { fieldPath: "timestamp" }, direction: "DESCENDING" },
+                { field: { fieldPath: "__name__" }, direction: "DESCENDING" },
               ],
             }
           : {}),
@@ -208,8 +225,11 @@ export async function readTraffic(
       const body: { document?: FirestoreDocument }[] = await response.json();
       if (!Array.isArray(body))
         throw new Error("The data service returned an unexpected response.");
+      const documents = body.flatMap((entry) =>
+        entry.document ? [entry.document] : [],
+      );
       const records = normalize(
-        body.flatMap((entry) => (entry.document ? [entry.document] : [])),
+        history ? dailyObservations(documents) : documents,
       );
       cache.set(collection, { at: Date.now(), records });
       return records;

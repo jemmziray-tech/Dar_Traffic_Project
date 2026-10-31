@@ -37,7 +37,7 @@ flowchart LR
 
 Collection runs every half-hour from 06:00 to 22:30 Tanzania time. The website refreshes stored readings every minute while its tab is visible. It treats observations older than 90 minutes as stale and does not substitute simulated data when the feed is unavailable.
 
-The public Firestore interface allows reads from `live_traffic` and `traffic_history`; writes require the collector's Google identity. History queries are limited to the latest 5,000 records across all corridors. Saved corridors stay on the visitor's device.
+The public Firestore interface allows small, limited reads from `live_traffic`, `daily_history` and `traffic_history`; writes require the collector's Google identity. History reads one summary document per day, up to 31 days. Saved corridors stay on the visitor's device.
 
 Extra delay is the positive difference between Google's traffic estimate and its baseline. It is not a city-wide congestion score. The website does not predict traffic or claim that a zero-delay estimate means an empty road. Any future model needs suitable training rights and independent validation.
 
