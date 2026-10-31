@@ -133,7 +133,13 @@ def test_success_writes_live_and_history_atomically(monkeypatch):
     assert collector.collect_road(
         {"id": "ubungo", "name": "Ubungo", "start": "a", "end": "b"}, ("28 C, Clear", 0)
     )
-    assert db.batch.return_value.set.call_count == 2
+    writes = db.batch.return_value.set.call_args_list
+    assert len(writes) == 3
+    live, history, daily = (call.args[1] for call in writes)
+    assert "expire_at" not in live
+    assert history["expire_at"] == daily["expire_at"]
+    assert daily["observations"] is not None
+    assert writes[2].kwargs == {"merge": True}
     db.batch.return_value.commit.assert_called_once()
 
 

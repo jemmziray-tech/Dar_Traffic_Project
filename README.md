@@ -39,6 +39,7 @@ flowchart TD
         Secret[Secret Manager: restricted Maps key] --> Job
         Job -->|Atomic write per corridor| Live[(Firestore: live_traffic)]
         Job -->|Same batch| History[(Firestore: traffic_history)]
+        Job -->|Same batch| Daily[(Firestore: daily_history)]
         Job --> Lease[(Private collection lease)]
     end
 
@@ -53,7 +54,7 @@ flowchart TD
     Repository -->|Tested frontend release from web/| Website
     Streamlit[Old Streamlit address] -->|Moved notice and website link| Visitors
     Live -->|Public reads, no client writes| Reader
-    History -->|Latest 5,000 records| Reader
+    Daily -->|Last 31 daily summaries| Reader
     Pages --> Visitors[Dashboard visitors]
 ```
 
@@ -124,7 +125,7 @@ Additional delay is `max(traffic time - provider baseline, 0)`. These are provid
 
 The collector calculates delay from provider seconds before rounding durations. The dashboard preserves that delay, subject to a rounding-consistency check. Missing weather remains unknown and never changes the traffic estimate.
 
-History views read at most the latest 5,000 records across all corridors. Hours without samples remain missing; they are not filled with zeroes or interpolated forecasts.
+History views read one summary document per day, up to the last 31 days. Stored observations expire after 30 days through a Firestore TTL policy. Hours without samples remain missing; they are not filled with zeroes or interpolated forecasts.
 
 ## Operations and development
 

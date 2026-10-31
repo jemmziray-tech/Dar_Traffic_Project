@@ -2,12 +2,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Public traffic observations only. Authenticated collector writes use IAM.
+    // List queries must set a small limit so one visitor cannot read the
+    // whole database (and the project's read quota) in a single request.
     match /live_traffic/{document} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
+      allow create, update, delete: if false;
+    }
+    match /daily_history/{day} {
+      allow get: if true;
+      allow list: if request.query.limit <= 31;
       allow create, update, delete: if false;
     }
     match /traffic_history/{document} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 100;
       allow create, update, delete: if false;
     }
     match /{document=**} {

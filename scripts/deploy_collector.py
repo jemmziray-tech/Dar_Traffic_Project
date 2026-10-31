@@ -178,6 +178,18 @@ def prepare():
         f"--member=serviceAccount:{RUNTIME}",
         "--role=roles/secretmanager.secretAccessor",
     )
+    # Delete stored observations after their `expire_at` time (see RETENTION_DAYS).
+    for collection in ("traffic_history", "daily_history"):
+        gcloud(
+            "firestore",
+            "fields",
+            "ttls",
+            "update",
+            "expire_at",
+            f"--collection-group={collection}",
+            "--enable-ttl",
+            "--async",
+        )
     print("Collector resources and scoped permissions prepared. No secret values displayed.")
 
 
