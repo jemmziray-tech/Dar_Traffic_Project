@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.next-previous-build/
+out/
+*.tsbuildinfo
+.env*
+.openai/workflow-metrics.jsonl
