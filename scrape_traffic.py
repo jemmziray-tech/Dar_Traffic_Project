@@ -13,13 +13,25 @@ logger = logging.getLogger(__name__)
 gmaps = None
 
 
+class SingleAttemptMapsClient(googlemaps.Client):
+    def _request(self, *args, **kwargs):
+        # A zero SDK retry window can reject the first attempt before it is sent.
+        # Stop recursive retry calls instead, leaving the first request usable.
+        retry_counter = kwargs.get("retry_counter", args[3] if len(args) > 3 else 0)
+        if retry_counter:
+            raise googlemaps.exceptions.Timeout()
+        return super()._request(*args, **kwargs)
+
+
 def initialize_clients():
     """Connect only when executing, so validation can run without cloud secrets."""
     global gmaps
     key = os.getenv("MAPS_API_KEY")
     if not key or key == "YOUR_GOOGLE_API_KEY_HERE":
         raise RuntimeError("MAPS_API_KEY is required for traffic-aware collection")
-    gmaps = googlemaps.Client(key=key, timeout=15, retry_timeout=0, retry_over_query_limit=False)
+    gmaps = SingleAttemptMapsClient(
+        key=key, timeout=15, retry_timeout=60, retry_over_query_limit=False
+    )
 
 
 class TrafficObservation(BaseModel):

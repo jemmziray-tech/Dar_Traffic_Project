@@ -137,8 +137,26 @@ def test_success_returns_a_live_reading_without_a_database_client(monkeypatch):
 
 def test_live_provider_disables_automatic_retries(monkeypatch):
     maps_client = MagicMock()
-    monkeypatch.setattr(collector.googlemaps, "Client", maps_client)
+    monkeypatch.setattr(collector, "SingleAttemptMapsClient", maps_client)
     monkeypatch.setenv("MAPS_API_KEY", "test-key")
     collector.initialize_clients()
-    assert maps_client.call_args.kwargs["retry_timeout"] == 0
+    assert maps_client.call_args.kwargs["retry_timeout"] == 60
     assert maps_client.call_args.kwargs["retry_over_query_limit"] is False
+
+
+def test_sdk_sends_initial_request_but_never_retries():
+    client = collector.SingleAttemptMapsClient(key="AIza" + "x" * 35, timeout=15, retry_timeout=60)
+    response = MagicMock(status_code=503)
+    client.session.get = MagicMock(return_value=response)
+    with pytest.raises(collector.googlemaps.exceptions.Timeout):
+        client.distance_matrix("a", "b")
+    assert client.session.get.call_count == 1
+
+
+def test_sdk_first_request_can_succeed():
+    client = collector.SingleAttemptMapsClient(key="AIza" + "x" * 35, timeout=15, retry_timeout=60)
+    response = MagicMock(status_code=200)
+    response.json.return_value = {"status": "OK", "rows": []}
+    client.session.get = MagicMock(return_value=response)
+    assert client.distance_matrix("a", "b")["status"] == "OK"
+    assert client.session.get.call_count == 1
