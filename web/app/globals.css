@@ -2367,6 +2367,8 @@ td strong {
 .live-comparison { margin: 24px 0; padding-bottom: 18px; }
 .live-comparison > .caption, .live-comparison > .google-attribution { margin-left: 24px; margin-right: 24px; }
 .live-comparison .section-heading { flex-wrap: wrap; gap: 18px; }
+.live-comparison .section-heading > div { min-width: 0; }
+.live-comparison .caption { white-space: normal; line-height: 1.6; }
 .comparison-scale { display: flex; justify-content: space-between; margin: 24px 66px 10px 36%; font-size: 12px; color: var(--muted, #607568); }
 .comparison-bars { list-style: none; padding: 0; margin: 0 24px; }
 .comparison-bars li { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(100px, 1.6fr) 66px; align-items: center; gap: 18px; padding: 12px 0; border-bottom: 1px solid #edf1eb; }
