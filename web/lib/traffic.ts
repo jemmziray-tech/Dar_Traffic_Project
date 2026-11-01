@@ -16,6 +16,14 @@ export type FirestoreDocument = {
   name?: string;
   fields?: Record<string, Record<string, unknown>>;
 };
+export type HistoryObservation = Omit<Observation, "baselineMinutes" | "delayMinutes"> & {
+  baselineMinutes: number | null;
+  delayMinutes: number | null;
+  expiresAt: number;
+  sourceId: string;
+  rightsReference: string;
+  trainingAllowed: boolean;
+};
 export const ROADS: Road[] = configuredRoads;
 export const FRESH_MS = 90 * 60 * 1000;
 const roadIndex = new Map(ROADS.map((road) => [road.id, road]));
@@ -138,106 +146,93 @@ export function age(timestamp: number, now = Date.now()) {
 export function directions(road: Road) {
   return `https://www.google.com/maps/dir/?${new URLSearchParams({ api: "1", origin: road.start, destination: road.end, travelmode: "driving" })}`;
 }
-export function csv(records: Observation[]) {
-  const rows: (string | number)[][] = [
-    [
-      "Corridor",
-      "Observed UTC",
-      "Traffic minutes",
-      "Baseline minutes",
-      "Extra delay minutes",
-      "Distance km",
-      "Weather",
-    ],
-    ...records.map((record) => [
-      record.name,
-      new Date(record.timestamp).toISOString(),
-      record.trafficMinutes,
-      record.baselineMinutes,
-      record.delayMinutes,
-      record.distanceKm,
-      record.weather,
-    ]),
+export function csv(records: HistoryObservation[]) {
+  const rows: (string | number | boolean | null)[][] = [
+    ["Corridor", "Observed UTC", "Travel minutes", "Reference minutes", "Extra delay minutes", "Distance km", "Source", "Rights reference", "Training permitted"],
+    ...records.map(record => [record.name, new Date(record.timestamp).toISOString(), record.trafficMinutes,
+      record.baselineMinutes, record.delayMinutes, record.distanceKm, record.sourceId, record.rightsReference, record.trainingAllowed]),
   ];
-  return rows
-    .map((row) =>
-      row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","),
-    )
-    .join("\r\n");
+  return rows.map(row => row.map(cell => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\r\n");
 }
 
 const endpoint =
   "https://firestore.googleapis.com/v1/projects/dar-traffic/databases/(default)/documents:runQuery";
-const cache = new Map<string, { at: number; records: Observation[] }>();
-const pending = new Map<string, Promise<Observation[]>>();
-/** Expand `daily_history` documents into the observations stored in each day. */
-export function dailyObservations(
-  documents: FirestoreDocument[],
-): FirestoreDocument[] {
-  return documents.flatMap((document) => {
-    const array = document.fields?.observations?.arrayValue as
-      | { values?: { mapValue?: FirestoreDocument }[] }
-      | undefined;
-    return (array?.values ?? []).flatMap((value) =>
-      value.mapValue ? [value.mapValue] : [],
-    );
+const pendingLive: { request?: Promise<Observation[]> } = {};
+const pendingHistory: { request?: Promise<HistoryObservation[]> } = {};
+let historyCache: { at: number; records: HistoryObservation[] } | undefined;
+export const LIVE_API_URL = "https://dar-traffic-live-tvpcat636q-bq.a.run.app";
+export const HISTORY_DAYS = 30;
+
+export function dailyObservations(documents: FirestoreDocument[]): FirestoreDocument[] {
+  return documents.flatMap(document => {
+    const array = document.fields?.observations?.arrayValue as { values?: { mapValue?: FirestoreDocument }[] } | undefined;
+    return (array?.values ?? []).flatMap(value => value.mapValue ? [value.mapValue] : []);
   });
 }
 
-export async function readTraffic(
-  history = false,
-  force = false,
-): Promise<Observation[]> {
-  // History reads one summary document per day (at most 31), not raw records.
-  const collection = history ? "daily_history" : "live_traffic";
-  const cached = cache.get(collection);
-  // Collection runs every 30 minutes, so a five-minute cache keeps the clock
-  // ticking each minute without re-reading Firestore each minute.
-  if (!force && cached && Date.now() - cached.at < 300000)
-    return cached.records;
-  if (pending.has(collection)) return pending.get(collection)!;
-  const promise = (async () => {
-    const controller = new AbortController(),
-      timer = setTimeout(() => controller.abort(), 20000);
+export function normalizeHistory(documents: FirestoreDocument[], now = Date.now()): HistoryObservation[] {
+  const records: HistoryObservation[] = [];
+  const seen = new Set<string>();
+  for (const document of documents) {
+    const value = Object.fromEntries(Object.entries(document.fields ?? {}).map(([key, field]) => [key, decode(field)]));
+    const road = roadIndex.get(String(value.road_id));
+    const timestamp = value.timestamp, expiry = value.expire_at;
+    const travel = value.travel_minutes, distance = value.distance_km;
+    const baseline = value.baseline_minutes ?? null;
+    if (!road || value.schema_version !== 3 || value.history_allowed !== true || value.public_display_allowed !== true || value.derived_from_google_maps !== false) continue;
+    if (!["own_measurements", "licensed_dataset"].includes(String(value.source_kind)) || typeof value.rights_reference !== "string" || !value.rights_reference.trim()) continue;
+    if (typeof timestamp !== "number" || timestamp > now || timestamp < now - HISTORY_DAYS * 86400000 || timestamp <= 0) continue;
+    if (typeof expiry !== "number" || !Number.isFinite(expiry) || expiry <= now) continue;
+    if (typeof travel !== "number" || !Number.isFinite(travel) || travel <= 0 || typeof distance !== "number" || !Number.isFinite(distance) || distance <= 0) continue;
+    if (baseline !== null && (typeof baseline !== "number" || !Number.isFinite(baseline) || baseline <= 0)) continue;
+    if (typeof value.record_id !== "string" || seen.has(value.record_id) || typeof value.source_id !== "string") continue;
+    seen.add(value.record_id);
+    records.push({ roadId: road.id, name: road.name, timestamp, trafficMinutes: travel,
+      baselineMinutes: baseline as number | null,
+      delayMinutes: baseline === null ? null : Math.max(0, travel - (baseline as number)),
+      distanceKm: distance, speedKmh: distance / (travel / 60), weather: "Not supplied",
+      expiresAt: expiry, sourceId: value.source_id, rightsReference: value.rights_reference, trainingAllowed: value.training_allowed === true });
+  }
+  return records.sort((a,b) => a.timestamp-b.timestamp);
+}
+
+async function requestJSON(url: string, options: RequestInit = {}) {
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 45000);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal, cache: "no-store" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : "The data service is temporarily unavailable.");
+    return body;
+  } finally { clearTimeout(timer); }
+}
+
+export function readLive(): Promise<Observation[]> {
+  if (pendingLive.request) return pendingLive.request;
+  pendingLive.request = (async () => {
     try {
-      const structuredQuery = {
-        from: [{ collectionId: collection }],
-        limit: history ? 31 : 50,
-        ...(history
-          ? {
-              orderBy: [
-                { field: { fieldPath: "__name__" }, direction: "DESCENDING" },
-              ],
-            }
-          : {}),
-      };
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ structuredQuery }),
-        signal: controller.signal,
-        cache: "no-store",
-      });
-      if (!response.ok)
-        throw new Error(
-          "Traffic data is temporarily unavailable. Please try again.",
-        );
-      const body: { document?: FirestoreDocument }[] = await response.json();
-      if (!Array.isArray(body))
-        throw new Error("The data service returned an unexpected response.");
-      const documents = body.flatMap((entry) =>
-        entry.document ? [entry.document] : [],
-      );
-      const records = normalize(
-        history ? dailyObservations(documents) : documents,
-      );
-      cache.set(collection, { at: Date.now(), records });
-      return records;
-    } finally {
-      clearTimeout(timer);
-      pending.delete(collection);
-    }
+      const body = await requestJSON(`${LIVE_API_URL}/live`);
+      if (!Array.isArray(body.documents)) throw new Error("The live service returned an unexpected response.");
+      return normalize(body.documents);
+    } finally { delete pendingLive.request; }
   })();
-  pending.set(collection, promise);
-  return promise;
+  return pendingLive.request;
+}
+
+export async function readHistory(force = false): Promise<HistoryObservation[]> {
+  if (!force && historyCache && Date.now() - historyCache.at < 300000) {
+    return historyCache.records.filter(record => record.timestamp >= Date.now() - HISTORY_DAYS * 86400000 && record.expiresAt > Date.now());
+  }
+  if (pendingHistory.request) return pendingHistory.request;
+  pendingHistory.request = (async () => {
+    try {
+      const body = await requestJSON(endpoint, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "permitted_daily_history" }], limit: 31,
+          orderBy: [{ field: { fieldPath: "__name__" }, direction: "DESCENDING" }] } }) });
+      if (!Array.isArray(body)) throw new Error("The history service returned an unexpected response.");
+      const records = normalizeHistory(dailyObservations(body.flatMap(entry => entry.document ? [entry.document] : [])));
+      historyCache = {at: Date.now(), records};
+      return records;
+    } finally { delete pendingHistory.request; }
+  })();
+  return pendingHistory.request;
 }

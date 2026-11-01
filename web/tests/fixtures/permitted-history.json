@@ -1,0 +1,49 @@
+{
+  "fields": {
+    "distance_km": {
+      "doubleValue": 3.0
+    },
+    "expire_at": {
+      "timestampValue": "2027-01-29T08:30:00Z"
+    },
+    "source_id": {
+      "stringValue": "test-survey"
+    },
+    "baseline_minutes": {
+      "nullValue": null
+    },
+    "history_allowed": {
+      "booleanValue": true
+    },
+    "travel_minutes": {
+      "doubleValue": 12.5
+    },
+    "schema_version": {
+      "integerValue": "3"
+    },
+    "derived_from_google_maps": {
+      "booleanValue": false
+    },
+    "training_allowed": {
+      "booleanValue": true
+    },
+    "road_id": {
+      "stringValue": "mwenge"
+    },
+    "rights_reference": {
+      "stringValue": "Fixture only; not a real dataset"
+    },
+    "source_kind": {
+      "stringValue": "own_measurements"
+    },
+    "record_id": {
+      "stringValue": "0c0050c3809820a0ed45f360ab0d3d3a4c6817768607ff1d46f9d3b16f00f489"
+    },
+    "public_display_allowed": {
+      "booleanValue": true
+    },
+    "timestamp": {
+      "timestampValue": "2026-10-31T08:30:00Z"
+    }
+  }
+}

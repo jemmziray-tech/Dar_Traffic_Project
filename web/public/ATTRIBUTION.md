@@ -1,0 +1,1 @@
+Google Maps logos are official, unmodified attribution assets from https://developers.google.com/static/maps/documentation/images/Google_Maps_Attribution_Assets.zip. Their use follows https://developers.google.com/maps/documentation/distance-matrix/policies.

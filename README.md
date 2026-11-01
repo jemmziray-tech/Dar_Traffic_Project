@@ -1,136 +1,57 @@
 # Dar Traffic
 
-Traffic observations for 21 configured corridors in Dar es Salaam, Tanzania.
+**[Open Dar Traffic](https://dartraffic.vercel.app/)**
 
-**Live website: [dartraffic.vercel.app](https://dartraffic.vercel.app/)**
+I started this project to make traffic on Dar es Salaam’s roads easier to understand. It covers 21 configured corridors. The website compares current travel estimates, shows each route’s endpoints and lets you save roads on your own device.
 
-Open the website to explore corridor travel times, search roads and view recorded history. No sign-in is required.
+## What the charts show
 
-The collector requests traffic-aware travel estimates from Google Distance Matrix and weather context from Open-Meteo. It writes the latest observation and a history record to Firestore. The Next.js website reads those records without a service-account key. The old Streamlit address now points visitors to the new website.
+On Overview, choose **Load live comparison**. The horizontal chart compares travel time or extra delay across corridors. Each bar has its exact value and links to the road details. Routes have different lengths, so a longer travel time does not necessarily mean worse congestion. Extra delay compares Google’s current estimate with its baseline; zero does not mean an empty road.
 
-## Current scope
+Google estimates are requested on demand and are not saved as traffic history or offered as CSV downloads. There is no background collection schedule. The old Cloud Scheduler writer is paused.
 
-- View recent corridor travel times, baseline times and additional delay.
-- Search corridors, inspect historical observations and download CSV files.
-- Check collection coverage and missing or stale records.
-- Inspect individual endpoint pairs and open directions in Google Maps.
-- Save frequently used corridors on your device.
-
-Forecasting is not available: no model has been validated against the fresh database. There is no traffic-signal control, city-wide efficiency score or measured economic-loss estimate.
-
-Google Cloud Scheduler starts a Cloud Run Job **every 30 minutes, 06:00-22:30 EAT**. GitHub hosts the code and runs tests; it no longer runs collection. This is 34 scheduled runs, or 714 routing elements for 21 corridors, per day before retries. Model training is not enabled. The app excludes observations older than 90 minutes from current summaries, so it will show stale data when collection has not run recently.
+History is a separate path for independently collected or licensed observations. It is empty until a reviewed dataset is imported. A missing baseline stays unknown. No production training dataset is connected and no forecasting model has been validated.
 
 ## Architecture
 
-The project has two parts: a collector that writes observations, and a website that reads them. Keeping those jobs separate lets people browse the dashboard without giving the website permission to collect traffic or change the database.
-
 ```mermaid
 flowchart TD
-    Repository[GitHub repository] --> Checks[Tests, lint and formatting]
-    Repository -->|Release collector source| Build
-    Maintainer[Maintainer using Google Cloud CLI] -->|Deploy a tested release| Build
-
-    subgraph Google[Google Cloud: dar-traffic]
-        Build[Cloud Build: Johannesburg] --> Registry[Artifact Registry: collector image]
-        Registry --> Job[Cloud Run Job: dar-traffic-collector]
-        Scheduler[Cloud Scheduler: 06:00-22:30 EAT] -->|Authenticated run request| Job
-        Invoker[Scheduler service account] -.->|Invoke this job only| Scheduler
-        Runtime[Collector service account] -.->|Firestore and secret access| Job
-        Secret[Secret Manager: restricted Maps key] --> Job
-        Job -->|Atomic write per corridor| Live[(Firestore: live_traffic)]
-        Job -->|Same batch| History[(Firestore: traffic_history)]
-        Job -->|Same batch| Daily[(Firestore: daily_history)]
-        Job --> Lease[(Private collection lease)]
-    end
-
-    Maps[Google Maps Platform: Distance Matrix] -->|Traffic estimates| Job
-    Weather[Open-Meteo] -->|Weather context| Job
-
-    subgraph Website[Next.js website: Vercel hosting]
-        Reader[Read-only Firestore REST client] --> Validation[Source, value and freshness checks]
-        Validation --> Pages[Overview, corridors, history, data status and about]
-    end
-
-    Repository -->|Tested frontend release from web/| Website
-    Streamlit[Old Streamlit address] -->|Moved notice and website link| Visitors
-    Live -->|Public reads, no client writes| Reader
-    Daily -->|Last 31 daily summaries| Reader
-    Pages --> Visitors[Dashboard visitors]
+    Visitor[Visitor: Load live comparison] --> Web[Next.js website on Vercel]
+    Web -->|Explicit request| Live[Cloud Run: dar-traffic-live]
+    Secret[Secret Manager: restricted Maps key] --> Live
+    Maps[Google Distance Matrix] -->|Current estimates| Live
+    Weather[Open-Meteo] -->|Weather context| Live
+    Live -->|Response only, no traffic storage| Web
+    Live -->|Request counts only| Usage[(Private usage counters)]
+    Source[Reviewed independent observations] --> Import[Validate source permissions and measurements]
+    Import --> Raw[(Private permitted observations)]
+    Import --> Public[(Permitted daily history)]
+    Public -->|Bounded read| Web
+    Raw --> Export[Permission-checked training export]
+    GitHub[GitHub: source and tests] --> Web
+    Build[Cloud Build and Artifact Registry] --> Live
 ```
 
-### How an observation reaches the dashboard
-
-1. Cloud Scheduler calls the Cloud Run Jobs API using its own service account. That account can invoke only the collector job. The container uses its attached service account for Firestore and Secret Manager; there is no downloaded service-account key.
-2. The collector requests traffic estimates for the endpoint pairs in `config.py`. Open-Meteo supplies weather context, which does not alter the traffic measurements.
-3. Each successful corridor is written to the live and history collections in one Firestore batch. A failed request leaves the previous live observation intact and makes the job report a failure.
-4. The website reads the two collections through the public REST API. It checks the source, values and timestamps before displaying them. Current summaries exclude stale records; historical views retain their timestamps.
-
-The Maps API key and Google Cloud credentials serve different purposes. The restricted key in Secret Manager authorizes Maps requests. The attached collector service account authorizes Firestore writes. The public website uses neither credential. A transactional lease prevents overlapping executions and a second collection in the same half-hour slot.
-
-### What is not in the live architecture
-
-The earlier version included forecasting, a Gemini assistant and reinforcement-learning experiments. Those are not running in the current application. The replacement website does not include a forecast page or an intervention simulator. Earlier Streamlit views remain recoverable in Git history.
-
-The standard [Google Maps terms, section 3.2.3(c)](https://cloud.google.com/maps-platform/terms) prohibit using Maps content to train, test or validate models. A future forecasting pipeline needs independently collected or otherwise appropriately licensed data. It would read that permitted history, evaluate a model on later dates, compare it with simple baselines, and publish its error before serving predictions. That is planned work, not an existing service or a claimed accuracy result.
+Cloud Run uses an attached service account. The public website receives neither Google Cloud credentials nor the Maps key. The service reserves a request allowance before contacting Maps: at most 714 route elements per Tanzania calendar day, one full request per minute across all visitors, with SDK retries disabled. That service limit does not cap charges from other uses of the Cloud project.
 
 ## Run locally
 
-The website uses Node.js 24:
-
 ```sh
+pip install -r requirements.txt
+python -m pytest tests/ -v
 cd web
 npm ci
+npm test
+npm run typecheck
 npm run dev
 ```
 
-To check and build the website:
+The website uses the deployed on-demand service. Browsing pages does not automatically make Maps requests; pressing a live-load button does. Keep tests mocked and do not commit keys or production data.
 
-```sh
-npm test
-npm run typecheck
-npm run build
-```
+## Data and operations
 
-The build exports static files to `web/out/`. See [website instructions](web/README.md). No cloud credentials are required to browse the two public traffic collections.
+- [Data sources and imports](docs/DATA_SOURCES.md)
+- [Deployment and retention](docs/OPERATIONS.md)
+- [Dashboard measurements](docs/DASHBOARD.md)
 
-The collector and compatibility notice use Python 3.11 or later. From the repository root, install `requirements-dev.txt`, then run:
-
-```sh
-python -m pytest tests/ -v
-python -m ruff check .
-python -m ruff format --check .
-```
-
-`python -m streamlit run app.py` runs only the moved notice for the old address, not the traffic dashboard.
-
-## Repository layout
-
-| File or directory | Purpose |
-| --- | --- |
-| `web/app/`, `web/components/` | Modern website routes and interface |
-| `web/lib/`, `web/tests/` | Public data reader, validation and tests |
-| `app.py` | Moved notice for existing Streamlit bookmarks |
-| `config.py` | Monitored corridor IDs, names and endpoints |
-| `scrape_traffic.py` | Traffic collection, duplicate-run protection and atomic writes |
-| `Dockerfile.collector`, `cloudbuild.collector.yaml`, `scripts/` | Google-hosted collector build and deployment |
-| `firestore.rules` | Public traffic reads; client writes denied |
-| `tests/` | Collector, lease and compatibility checks |
-| `docs/` | Website behavior and operating instructions |
-
-Website, collector and compatibility notice dependencies are separate. The website uses `web/package.json`; Streamlit installs only the single dependency in `requirements.txt`.
-
-## Interpreting the data
-
-Additional delay is `max(traffic time - provider baseline, 0)`. These are provider estimates for specific endpoint pairs, not physical sensor readings. Corridors can overlap. Summing their delays does not measure total time lost by all travellers or congestion across the entire city.
-
-The collector calculates delay from provider seconds before rounding durations. The dashboard preserves that delay, subject to a rounding-consistency check. Missing weather remains unknown and never changes the traffic estimate.
-
-History views read one summary document per day, up to the last 31 days. Stored observations expire after 30 days through a Firestore TTL policy. Hours without samples remain missing; they are not filled with zeroes or interpolated forecasts.
-
-## Operations and development
-
-See [operating instructions](docs/OPERATIONS.md) for the Google Cloud project, collector authentication and deployment. [Dashboard behavior](docs/DASHBOARD.md) describes the calculations and limits. [Contributing](CONTRIBUTING.md) covers checks and change conventions.
-
-Earlier API, modelling and simulation experiments are available in Git history. They are not part of the deployed application and their historical accuracy claims do not describe this version.
-
-Maintained by John Mziray.
+My longer-term aim is to train a useful traffic model on observations I have permission to retain and use for training. The next step is securing that dataset, then evaluating simple baselines with time-separated test data before claiming any prediction accuracy.

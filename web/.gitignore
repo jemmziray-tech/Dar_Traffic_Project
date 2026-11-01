@@ -6,3 +6,5 @@ out/
 .env*
 .openai/workflow-metrics.jsonl
 .vercel/
+
+.next-*/

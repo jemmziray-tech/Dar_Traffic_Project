@@ -6,11 +6,11 @@ import {
   useEffect,
   useState,
 } from "react";
-import { Observation, readTraffic, ROADS } from "@/lib/traffic";
+import { HistoryObservation, Observation, readHistory, readLive, ROADS } from "@/lib/traffic";
 
 type Data = {
   live: Observation[];
-  history: Observation[];
+  history: HistoryObservation[];
   loading: boolean;
   historyLoading: boolean;
   error: string | null;
@@ -24,22 +24,22 @@ type Data = {
 const Context = createContext<Data | null>(null);
 export function TrafficProvider({ children }: { children: React.ReactNode }) {
   const [live, setLive] = useState<Observation[]>([]),
-    [history, setHistory] = useState<Observation[]>([]);
-  const [loading, setLoading] = useState(true),
+    [history, setHistory] = useState<HistoryObservation[]>([]);
+  const [loading, setLoading] = useState(false),
     [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null),
     [historyError, setHistoryError] = useState<string | null>(null);
   const [now, setNow] = useState(0),
     [saved, setSaved] = useState<string[]>([]);
   const [storageReady, setStorageReady] = useState(false);
-  const fetchLive = useCallback(async (force = false) => {
+  const fetchLive = useCallback(async () => {
     setLoading(true);
     try {
-      setLive(await readTraffic(false, force));
+      setLive(await readLive());
       setError(null);
-    } catch {
+    } catch (error) {
       setError(
-        "We couldn’t refresh the traffic feed. Check your connection and try again.",
+        error instanceof Error ? error.message : "We could not refresh the traffic feed. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -49,11 +49,11 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
   const loadHistory = useCallback(async (force = false) => {
     setHistoryLoading(true);
     try {
-      setHistory(await readTraffic(true, force));
+      setHistory(await readHistory(force));
       setHistoryError(null);
     } catch {
       setHistoryError(
-        "We couldn’t load the recorded history. Please try again.",
+        "We could not load the recorded history. Please try again.",
       );
     } finally {
       setHistoryLoading(false);
@@ -61,7 +61,6 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
   }, []);
   useEffect(() => {
     setNow(Date.now());
-    void fetchLive();
     try {
       const value = JSON.parse(
         localStorage.getItem("dar-traffic-saved") ?? "[]",
@@ -74,10 +73,9 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
     setStorageReady(true);
     const timer = setInterval(() => {
       setNow(Date.now());
-      if (document.visibilityState === "visible") void fetchLive();
     }, 60000);
     return () => clearInterval(timer);
-  }, [fetchLive]);
+  }, []);
   useEffect(() => {
     if (!storageReady) return;
     try {
@@ -106,7 +104,7 @@ export function TrafficProvider({ children }: { children: React.ReactNode }) {
         historyError,
         now,
         saved,
-        refresh: () => fetchLive(true),
+        refresh: fetchLive,
         loadHistory,
         toggleSaved,
       }}
