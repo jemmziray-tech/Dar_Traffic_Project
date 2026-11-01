@@ -23,6 +23,7 @@ import {
   isFresh,
   latest,
   Observation,
+  HistoryObservation,
   ROADS,
 } from "@/lib/traffic";
 
@@ -50,7 +51,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const current =
     navigation.find(
       (item) => item.href === pathname || item.href.slice(0, -1) === pathname,
-    ) ?? navigation[0];
+    ) ?? { href: pathname, label: pathname.includes("privacy") ? "Privacy" : "Terms" };
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
@@ -77,10 +78,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span className="mini-icon">
             <Clock3 size={18} />
           </span>
-          <h3>A fresh look, every 30 min.</h3>
+          <h3>A fresh reading when you ask.</h3>
           <p>
-            Collection runs 06:00–22:30 EAT. Check the observation time before
-            you travel.
+            Use Load live comparison on Overview. Google readings stay on this
+            screen and are not saved to history.
           </p>
           <Link href="/quality/">
             How fresh is the data? <ArrowUpRight size={14} />
@@ -107,10 +108,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </span>
             <button
               className="icon-button refresh-button"
-              aria-label="Refresh traffic data"
-              title="Refresh stored observations"
-              onClick={() => void data.refresh()}
-              disabled={data.loading}
+              aria-label={pathname.includes("history") ? "Refresh permitted history" : "Load live estimates"}
+              title={pathname.includes("history") ? "Read permitted observations" : "Request fresh Google Maps estimates"}
+              onClick={() => void (pathname.includes("history") ? data.loadHistory(true) : data.refresh())}
+              disabled={data.loading || data.historyLoading}
             >
               <RefreshCw size={17} className={data.loading ? "spin" : ""} />
             </button>
@@ -124,9 +125,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
             Dar Traffic <span className="footer-dot">·</span> A closer look at
             the roads we share.
           </span>
-          <Link href="/about/">
-            Sources & methodology <ArrowUpRight size={13} />
-          </Link>
+          <div className="footer-links">
+            <Link href="/about/">Sources & methodology</Link>
+            <Link href="/terms/">Terms</Link>
+            <Link href="/privacy/">Privacy</Link>
+          </div>
         </footer>
       </div>
       <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -156,7 +159,7 @@ export function Freshness() {
     return (
       <div className="feed-status">
         <span className="status-dot muted" />
-        Connecting to the traffic feed…
+        Requesting current estimates…
       </div>
     );
   return (
@@ -187,11 +190,9 @@ export function Freshness() {
       {!loading && !fresh.length && !error && (
         <div className="subtle-notice">
           {timestamp
-            ? "The last snapshot is over 90 minutes old. Current conditions are unknown; previous observations are still available."
-            : "No validated observations are available yet. We don’t substitute sample traffic."}
-          <Link href="/history/">
-            View recorded history <ArrowUpRight size={14} />
-          </Link>
+            ? "This reading is over 90 minutes old. Request another estimate before relying on it."
+            : "Load a comparison to see current estimates. Google readings are not saved as history."}
+          <button className="button primary" onClick={() => void refresh()}>Load live estimates</button>
         </div>
       )}
     </div>
@@ -244,7 +245,7 @@ export function Download({
   records,
   filename = "dar-traffic-observations.csv",
 }: {
-  records: Observation[];
+  records: HistoryObservation[];
   filename?: string;
 }) {
   function download() {
@@ -307,12 +308,16 @@ export function TrustNote() {
     <div className="trust-note">
       <ShieldCheck size={17} />
       <p>
-        Google traffic estimates for monitored endpoint pairs. Coverage is
+        Google Maps estimates for monitored endpoint pairs. Coverage is
         limited to these corridors; this is not a city-wide congestion
         measurement.
       </p>
+      <GoogleAttribution />
     </div>
   );
+}
+export function GoogleAttribution({ dark = false }: { dark?: boolean }) {
+  return <span className="google-attribution"><img src={dark ? "/google-maps-white.svg" : "/google-maps.svg"} alt="Google Maps" height="18" /></span>;
 }
 export function LocationTag() {
   return (

@@ -1,7 +1,7 @@
 {
   "indexes": [
     {
-      "collectionGroup": "daily_history",
+      "collectionGroup": "permitted_daily_history",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -11,5 +11,9 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "permitted_daily_history", "fieldPath": "observations", "indexes": [] },
+    { "collectionGroup": "permitted_daily_history", "fieldPath": "expire_at", "indexes": [] },
+    { "collectionGroup": "_live_usage", "fieldPath": "expire_at", "indexes": [] }
+  ]
 }

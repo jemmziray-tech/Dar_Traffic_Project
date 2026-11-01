@@ -100,19 +100,16 @@ def test_weather_locations_keep_their_corresponding_values(monkeypatch):
     }
 
 
-def test_failed_provider_writes_nothing(monkeypatch):
-    maps, db = MagicMock(), MagicMock()
+def test_failed_provider_does_not_return_a_fake_reading(monkeypatch):
+    maps = MagicMock()
     maps.distance_matrix.return_value = {"status": "REQUEST_DENIED"}
     monkeypatch.setattr(collector, "gmaps", maps)
-    monkeypatch.setattr(collector, "db", db)
-    assert (
-        collector.collect_road({"id": "ubungo", "start": "a", "end": "b"}, ("Unknown", 0)) is False
-    )
-    db.batch.assert_not_called()
+    with pytest.raises(ValueError):
+        collector.fetch_road({"id": "ubungo", "start": "a", "end": "b"}, ("Unknown", None))
 
 
-def test_success_writes_live_and_history_atomically(monkeypatch):
-    maps, db = MagicMock(), MagicMock()
+def test_success_returns_a_live_reading_without_a_database_client(monkeypatch):
+    maps = MagicMock()
     maps.distance_matrix.return_value = {
         "status": "OK",
         "rows": [
@@ -129,28 +126,19 @@ def test_success_writes_live_and_history_atomically(monkeypatch):
         ],
     }
     monkeypatch.setattr(collector, "gmaps", maps)
-    monkeypatch.setattr(collector, "db", db)
-    assert collector.collect_road(
-        {"id": "ubungo", "name": "Ubungo", "start": "a", "end": "b"}, ("28 C, Clear", 0)
+    observation = collector.fetch_road(
+        {"id": "ubungo", "name": "Ubungo", "start": "a", "end": "b"}, ("Unknown", None)
     )
-    writes = db.batch.return_value.set.call_args_list
-    assert len(writes) == 3
-    live, history, daily = (call.args[1] for call in writes)
-    assert "expire_at" not in live
-    assert history["expire_at"] == daily["expire_at"]
-    assert daily["observations"] is not None
-    assert writes[2].kwargs == {"merge": True}
-    db.batch.return_value.commit.assert_called_once()
+    assert observation["live_mins"] == 2.5
+    assert observation["timestamp"].tzinfo is not None
+    assert "expire_at" not in observation
+    assert not hasattr(collector, "db")
 
 
-def test_collector_targets_only_fresh_project(monkeypatch):
-    client = MagicMock()
+def test_live_provider_disables_automatic_retries(monkeypatch):
     maps_client = MagicMock()
-    monkeypatch.setattr(collector.firestore, "Client", client)
     monkeypatch.setattr(collector.googlemaps, "Client", maps_client)
     monkeypatch.setenv("MAPS_API_KEY", "test-key")
-    monkeypatch.setenv("FIREBASE_KEY_JSON", '{"project_id":"dar-traffic-command"}')
-    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "dar-traffic-command")
     collector.initialize_clients()
-    client.assert_called_once_with(project="dar-traffic")
-    maps_client.assert_called_once()
+    assert maps_client.call_args.kwargs["retry_timeout"] == 0
+    assert maps_client.call_args.kwargs["retry_over_query_limit"] is False

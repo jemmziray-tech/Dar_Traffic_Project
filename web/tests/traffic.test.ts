@@ -1,3 +1,4 @@
+import historyFixture from "./fixtures/permitted-history.json";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -9,6 +10,9 @@ import {
   latest,
   median,
   normalize,
+  normalizeHistory,
+  readLive,
+  readHistory,
   ROADS,
   type FirestoreDocument,
 } from "../lib/traffic";
@@ -86,11 +90,11 @@ test("median handles missing data and does not mutate observations", () => {
 });
 
 test("CSV preserves quoted road names, timestamps and measured precision", () => {
-  const [record] = normalize([document()], now);
+  const [record] = normalizeHistory([historyFixture], now);
   const output = csv([{ ...record, name: 'Road, "A"' }]);
   assert.match(output, /"Road, ""A"""/);
-  assert.match(output, /2026-10-31T08:59:00.000Z/);
-  assert.match(output, /"0.07"/);
+  assert.match(output, /2026-10-31T08:30:00.000Z/);
+  assert.match(output, /"test-survey"/);
 });
 
 test("directions use the selected corridor’s actual endpoints", () => {
@@ -100,20 +104,49 @@ test("directions use the selected corridor’s actual endpoints", () => {
   assert.equal(url.searchParams.get("destination"), ROADS[0].end);
 });
 
-test("daily summaries expand into individually validated observations", () => {
-  const day: FirestoreDocument = {
-    fields: {
-      observations: {
-        arrayValue: {
-          values: [
-            { mapValue: document() },
-            { mapValue: document({ source: { stringValue: "simulation" } }) },
-          ],
-        },
-      },
-    },
+test("daily summaries cannot turn Google estimates into historical measurements", () => {
+  const day: FirestoreDocument = {fields:{observations:{arrayValue:{values:[{mapValue:document()}]}}}};
+  assert.deepEqual(normalizeHistory(dailyObservations([day]), now), []);
+});
+
+test("the actual Python importer wire format is accepted without a made-up baseline", () => {
+  const [record] = normalizeHistory([historyFixture], now);
+  assert.equal(record.trafficMinutes, 12.5);
+  assert.equal(record.baselineMinutes, null);
+  assert.equal(record.delayMinutes, null);
+  assert.equal(record.trainingAllowed, true);
+});
+
+test("expired, private and unlicensed historical observations stay out", () => {
+  const fields = historyFixture.fields;
+  for (const change of [
+    {expire_at:{timestampValue:new Date(now).toISOString()}},
+    {public_display_allowed:{booleanValue:false}},
+    {derived_from_google_maps:{booleanValue:true}},
+    {rights_reference:{stringValue:""}},
+    {timestamp:{timestampValue:new Date(now-31*86400000).toISOString()}},
+  ]) assert.equal(normalizeHistory([{fields:{...fields,...change}}],now).length,0);
+});
+
+test("live requests deduplicate only while in flight, without retaining a response cache", async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {calls++;return new Response(JSON.stringify({documents:[document()]}));};
+  try {
+    await Promise.all([readLive(),readLive()]);
+    assert.equal(calls,1);
+    await readLive();
+    assert.equal(calls,2);
+  } finally {globalThis.fetch=original;}
+});
+
+test("history queries only the permitted collection with a bounded limit", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    const query = JSON.parse(String(options?.body)).structuredQuery;
+    assert.equal(query.from[0].collectionId,"permitted_daily_history");
+    assert.equal(query.limit,31);
+    return new Response("[]");
   };
-  const records = normalize(dailyObservations([day, {}]), now);
-  assert.equal(records.length, 1);
-  assert.equal(records[0].roadId, ROADS[0].id);
+  try {assert.deepEqual(await readHistory(true),[]);} finally {globalThis.fetch=original;}
 });

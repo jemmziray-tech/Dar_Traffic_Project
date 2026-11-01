@@ -1,42 +1,29 @@
-"""Collect traffic estimates and write one live/history batch per corridor."""
+"""Read Google traffic estimates for immediate display, without storing them."""
 
-import concurrent.futures
 import logging
 import math
 import os
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import googlemaps
 import requests
-from google.cloud import firestore
 from pydantic import BaseModel, ConfigDict, Field
 
-from config import ROADS
-
 logger = logging.getLogger(__name__)
-EAT = timezone(timedelta(hours=3), "EAT")  # Tanzania has no daylight saving
-# Stored observations expire through a Firestore TTL policy on `expire_at`.
-# Confirm this period against the current Google Maps Platform terms.
-RETENTION_DAYS = 30
-db = None
 gmaps = None
 
 
 def initialize_clients():
     """Connect only when executing, so validation can run without cloud secrets."""
-    global db, gmaps
-    # Use the Cloud Run job's attached service account (Application Default Credentials).
-    # The destination is explicit: never fall back to the old Firebase project.
-    db = firestore.Client(project="dar-traffic")
+    global gmaps
     key = os.getenv("MAPS_API_KEY")
     if not key or key == "YOUR_GOOGLE_API_KEY_HERE":
         raise RuntimeError("MAPS_API_KEY is required for traffic-aware collection")
-    gmaps = googlemaps.Client(key=key, timeout=20, retry_timeout=30)
+    gmaps = googlemaps.Client(key=key, timeout=15, retry_timeout=0, retry_over_query_limit=False)
 
 
 class TrafficObservation(BaseModel):
-    """Fields stored with each successful traffic observation."""
+    """Values returned to the current visitor; these are not a training record."""
 
     model_config = ConfigDict(allow_inf_nan=False)
 
@@ -141,119 +128,32 @@ def parse_traffic_element(element):
     }
 
 
-def collect_road(road, weather_info):
+def fetch_road(road, weather_info):
     weather, precip_mm = weather_info
-    try:
-        result = gmaps.distance_matrix(
-            origins=road["start"],
-            destinations=road["end"],
-            mode="driving",
-            departure_time="now",
-            traffic_model="best_guess",
-        )
-        if result.get("status") != "OK":
-            raise ValueError(f"Routing request status: {result.get('status')}")
-        measurements = parse_traffic_element(result["rows"][0]["elements"][0])
-        delay = measurements["delay_mins"]
-        validated = TrafficObservation(
-            road_id=road["id"],
-            name=road["name"],
-            **measurements,
-            status="Smooth" if delay <= 3 else "Moderate" if delay <= 7 else "Heavy Jam",
-            weather=weather,
-            precipitation_mm=precip_mm,
-        ).model_dump()
-        observed_at = datetime.now(timezone.utc)
-        expire_at = observed_at + timedelta(days=RETENTION_DAYS)
-        batch = db.batch()
-        batch.set(
-            db.collection("live_traffic").document(road["id"]),
-            {**validated, "timestamp": firestore.SERVER_TIMESTAMP},
-        )
-        batch.set(
-            db.collection("traffic_history").document(),
-            {**validated, "timestamp": firestore.SERVER_TIMESTAMP, "expire_at": expire_at},
-        )
-        # One document per Tanzania calendar day lets the website read a week of
-        # history in 7 document reads instead of thousands.
-        batch.set(
-            db.collection("daily_history").document(observed_at.astimezone(EAT).date().isoformat()),
-            {
-                "observations": firestore.ArrayUnion([{**validated, "timestamp": observed_at}]),
-                "expire_at": expire_at,
-            },
-            merge=True,
-        )
-        batch.commit()
-        logger.info("Synced %s: delay %.2f minutes", road["id"], delay)
-        return True
-    except Exception:
-        logger.exception("Collection failed for %s; retaining last observation", road["id"])
-        return False
-
-
-def claim_collection(now=None):
-    """Allow one execution per half-hour slot, with a lease against overlap."""
-    now = now or datetime.now(timezone.utc)
-    slot = int(now.timestamp()) // 1800
-    owner = uuid.uuid4().hex
-    reference = db.collection("_collector_state").document("collection")
-
-    @firestore.transactional
-    def claim(transaction):
-        state = reference.get(transaction=transaction).to_dict() or {}
-        if state.get("slot") == slot or state.get("lease_until", now) > now:
-            return None
-        transaction.set(
-            reference,
-            {
-                "slot": slot,
-                "owner": owner,
-                "started_at": now,
-                "lease_until": now + timedelta(minutes=10),
-            },
-        )
-        return owner
-
-    return claim(db.transaction())
-
-
-def release_collection(owner):
-    reference = db.collection("_collector_state").document("collection")
-
-    @firestore.transactional
-    def release(transaction):
-        state = reference.get(transaction=transaction).to_dict() or {}
-        if state.get("owner") == owner:
-            transaction.update(reference, {"lease_until": datetime.now(timezone.utc)})
-
-    release(db.transaction())
-
-
-def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    initialize_clients()
-    owner = claim_collection()
-    if not owner:
-        logger.info(
-            "Collection skipped: this slot was already started or another run holds the lease"
-        )
-        return 0
-    try:
-        weather = get_weather_for_all_roads(ROADS)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            results = list(
-                executor.map(
-                    lambda road: collect_road(road, weather.get(road["id"], ("Unknown", None))),
-                    ROADS,
-                )
-            )
-        succeeded = sum(results)
-        logger.info("Collection complete: %s/%s roads", succeeded, len(ROADS))
-        return 0 if succeeded == len(ROADS) else 1
-    finally:
-        release_collection(owner)
+    result = gmaps.distance_matrix(
+        origins=road["start"],
+        destinations=road["end"],
+        mode="driving",
+        departure_time="now",
+        traffic_model="best_guess",
+    )
+    if result.get("status") != "OK":
+        raise ValueError("Traffic provider did not return a usable route")
+    measurements = parse_traffic_element(result["rows"][0]["elements"][0])
+    delay = measurements["delay_mins"]
+    observation = TrafficObservation(
+        road_id=road["id"],
+        name=road["name"],
+        **measurements,
+        status="Smooth" if delay <= 3 else "Moderate" if delay <= 7 else "Heavy Jam",
+        weather=weather,
+        precipitation_mm=precip_mm,
+    ).model_dump()
+    observation["timestamp"] = datetime.now(timezone.utc)
+    return observation
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(
+        "Scheduled Google history collection is retired. Run live_api.py for live display."
+    )

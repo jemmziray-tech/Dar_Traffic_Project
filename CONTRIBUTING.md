@@ -18,4 +18,4 @@ Keep public website URLs stable. `app.py` serves only a compatibility notice for
 
 Do not commit credentials, downloaded data, compiled Python files or generated models. Dependency files contain direct requirements for each component; include transitive packages only when the code imports them directly.
 
-The Google Cloud collector is a production operation. Do not change its approved schedule or run additional collection as part of CI. Changes to collection frequency require agreement on usage and cost.
+Live Maps requests are billable production operations. Do not call the live endpoint in CI or resume the retired scheduled writer. Historical imports must pass source-permission review; keep Google estimates out of retained and training datasets.

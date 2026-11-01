@@ -1,29 +1,9 @@
-# Website behavior
+# Reading the dashboard
 
-The public website is [Dar Traffic](https://dartraffic.vercel.app/). It uses the read-only `dar-traffic` Firestore feed.
+Overview compares current estimates across configured corridors. Travel-time bars show minutes for each endpoint pair; extra-delay bars show the positive difference from the provider baseline. Route lengths differ, so compare delay and the road details before drawing conclusions. The chart excludes missing and stale observations rather than replacing them with zero.
 
-| View | Capability | Limit |
-| --- | --- | --- |
-| Overview | Recent coverage, median and largest extra delay, corridor search, saved roads, sorting and CSV export | Current summaries exclude observations older than 90 minutes; no city-wide efficiency or economic-loss score |
-| Corridors | Traffic time, provider baseline, endpoint coordinates and a Google Maps directions link | Each reading belongs to one configured endpoint pair, not a complete journey |
-| History | Corridor and period selectors, observed travel-time points, underlying records and CSV | Up to 31 daily summary documents (observations are kept 30 days); no interpolation or forecast |
-| Data status | Recent, stale and missing corridors, timestamps and collection window | A stored snapshot does not prove that the scheduler is healthy |
-| About | Sources, calculations, coverage limits and model requirements | No validated prediction model is published |
+Live estimates are loaded by an explicit button. They are not stored as history, cached as a retained dataset or exported for model training. An observation older than 90 minutes is excluded from current summaries.
 
-## Data handling
+History accepts only independent observations with permission for retention and public display. Its line chart shows recorded travel times and a reference baseline only when one was supplied. An unknown baseline means unknown extra delay. Date windows and timestamps use Tanzania time. A small sample cannot establish a weekly pattern.
 
-Only schema 2 Google Distance Matrix observations with traffic explicitly observed, configured road IDs, finite positive durations and distance, and valid non-future timestamps are accepted. Stored delay must be non-negative and consistent with duration subtraction within rounding tolerance. Collector delay is preserved because it is calculated from provider seconds before durations are rounded to minutes. Missing weather stays unknown and does not change travel time.
-
-Extra delay is `max(traffic time - baseline, 0)`. Zero does not prove a road is empty. Corridors can overlap, so their delays cannot measure total person-minutes or congestion across the whole city.
-
-Live and history reads are cached for five minutes. The website checks for new live observations every five minutes while visible. Refresh never starts a paid Maps request. Saved roads stay in the visitor's browser; no account is required. CSV exports contain the selected records with UTC timestamps; on-screen observation times use Tanzania time.
-
-## Verification
-
-From `web/`, run `npm test`, `npm run typecheck` and `npm run build`. Browser verification covers real reads, navigation, search, saved roads, pagination, CSV downloads and desktop/phone layouts. Collector tests remain in the root `tests/` directory and must not contact paid APIs or write to production Firestore.
-
-Collection runs every 30 minutes from 06:00 to 22:30 EAT. There is no automatic training pipeline. A future model needs permitted data, evaluation on later held-out dates and published errors before a prediction interface is added.
-
-## Old Streamlit address
-
-The former Streamlit screens have been retired. `app.py` shows a moved notice with a link to the website, including the named routes used by old bookmarks. The previous implementation is available in Git history.
+The live comparison is available before a historical dataset exists. Historical charts remain empty until eligible records are imported. CSV downloads apply only to permitted historical records. There is no prediction, city-wide efficiency score or measured productivity-loss estimate.

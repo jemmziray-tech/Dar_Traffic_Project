@@ -30,14 +30,17 @@ import {
   latest,
   median,
   minutes,
+  HistoryObservation,
   Observation,
   ROADS,
 } from "@/lib/traffic";
 import { useTraffic } from "./provider";
+import { LiveComparison } from "./live-comparison";
 import {
   Download,
   Empty,
   Freshness,
+  GoogleAttribution,
   LocationTag,
   PageHeading,
   SaveButton,
@@ -148,7 +151,7 @@ export function Overview() {
       <PageHeading
         eyebrow="THE CITY AT A GLANCE"
         title="A closer look at Dar’s roads."
-        description="Traffic estimates, useful context, and a little less uncertainty."
+        description="Request current estimates for Dar’s monitored corridors. Google readings are not saved as history."
         action={<LocationTag />}
       />
       <Freshness />
@@ -182,6 +185,7 @@ export function Overview() {
           icon={Bookmark}
         />
       </div>
+      <LiveComparison />
       <div className="overview-middle">
         <section className="spotlight">
           <div className="spotlight-kicker">
@@ -194,7 +198,7 @@ export function Overview() {
               <p>
                 {worst
                   ? "The largest additional delay in the latest recent observations."
-                  : "Current conditions need a recent observation. Browse recorded history while the feed catches up."}
+                  : "Load the live comparison above to see current corridor estimates."}
               </p>
               <Link
                 className="button lime"
@@ -223,7 +227,7 @@ export function Overview() {
               Measured endpoint pairs
             </span>
             <span>
-              Google traffic estimates <ArrowUpRight size={12} />
+              <GoogleAttribution dark />
             </span>
           </div>
         </section>
@@ -250,9 +254,7 @@ export function Overview() {
               <span className="count-badge">{ROADS.length}</span>
             </h2>
           </div>
-          <Download
-            records={rows.flatMap((row) => (row.record ? [row.record] : []))}
-          />
+
         </div>
         <div className="table-controls">
           <div className="segmented" aria-label="Filter corridors">
@@ -569,7 +571,7 @@ export function Corridors() {
   );
 }
 
-function HistoryChart({ records }: { records: Observation[] }) {
+function HistoryChart({ records }: { records: HistoryObservation[] }) {
   if (!records.length) return null;
   const width = 900,
     height = 300,
@@ -584,7 +586,7 @@ function HistoryChart({ records }: { records: Observation[] }) {
       1,
       ...records.flatMap((record) => [
         record.trafficMinutes,
-        record.baselineMinutes,
+        ...(record.baselineMinutes === null ? [] : [record.baselineMinutes]),
       ]),
     ) * 1.15;
   const x = (stamp: number) =>
@@ -598,11 +600,11 @@ function HistoryChart({ records }: { records: Observation[] }) {
       <div className="chart-legend">
         <span>
           <i className="traffic-dot" />
-          Traffic estimate
+          Recorded travel time
         </span>
         <span>
           <i className="baseline-dot" />
-          Provider baseline
+          Reference time, when supplied
         </span>
         <small>Travel time · minutes</small>
       </div>
@@ -631,7 +633,7 @@ function HistoryChart({ records }: { records: Observation[] }) {
         })}
         {records.map((record, index) => (
           <g key={record.timestamp}>
-            <circle
+            {record.baselineMinutes !== null && <circle
               cx={x(record.timestamp)}
               cy={y(record.baselineMinutes)}
               r="5"
@@ -642,7 +644,7 @@ function HistoryChart({ records }: { records: Observation[] }) {
                 {eat(record.timestamp, true)} EAT: baseline{" "}
                 {minutes(record.baselineMinutes)} min
               </title>
-            </circle>
+            </circle>}
             <circle
               cx={x(record.timestamp)}
               cy={y(record.trafficMinutes)}
@@ -691,14 +693,14 @@ export function History() {
       data.history
         .filter(
           (record) =>
-            record.roadId === roadId &&
+            record.roadId === roadId && record.expiresAt > data.now && record.timestamp >= data.now - 30 * 86400000 &&
             (windowDays === "all" ||
               record.timestamp >= data.now - Number(windowDays) * 86400000),
         )
         .sort((a, b) => a.timestamp - b.timestamp),
     [data.history, roadId, windowDays, data.now],
   );
-  const typical = median(records.map((record) => record.delayMinutes)),
+  const typical = median(records.flatMap(record => record.delayMinutes === null ? [] : [record.delayMinutes])),
     days = new Set(
       records.map((record) =>
         new Intl.DateTimeFormat("en-CA", {
@@ -711,7 +713,7 @@ export function History() {
       <PageHeading
         eyebrow="THE RECORD, NOT A PREDICTION"
         title="Look back. Find the context."
-        description="Explore the observations behind a corridor, one timestamp at a time."
+        description="Independent observations with permission for storage and public display."
         action={
           <Download
             records={records}
@@ -778,9 +780,10 @@ export function History() {
             Loading the recorded observations…
           </div>
         ) : !records.length ? (
-          <Empty title="No observations in this period.">
-            Choose another corridor or a wider date range. Missing data is not
-            the same as zero delay.
+          <Empty title={data.history.length ? "No observations match these filters." : "Historical charts are waiting for permitted data."}>
+            Google estimates are live-only. Historical charts need independently collected or licensed observations.
+            No records match this corridor and period; missing data does not mean zero delay.
+            <Link className="history-live-link" href="/#live-comparison-title">View the live corridor comparison <ArrowRight size={16} /></Link>
           </Empty>
         ) : (
           <>
@@ -811,7 +814,7 @@ export function History() {
                   <th>TRAFFIC</th>
                   <th>BASELINE</th>
                   <th>EXTRA DELAY</th>
-                  <th>WEATHER</th>
+                  <th>SOURCE</th>
                 </tr>
               </thead>
               <tbody>
@@ -822,9 +825,9 @@ export function History() {
                     <tr key={record.timestamp}>
                       <td>{eat(record.timestamp, true)}</td>
                       <td>{minutes(record.trafficMinutes)} min</td>
-                      <td>{minutes(record.baselineMinutes)} min</td>
-                      <td>+{minutes(record.delayMinutes)} min</td>
-                      <td className="weather-cell">{record.weather}</td>
+                      <td>{record.baselineMinutes === null ? "Not supplied" : `${minutes(record.baselineMinutes)} min`}</td>
+                      <td>{record.delayMinutes === null ? "Not available" : `+${minutes(record.delayMinutes)} min`}</td>
+                      <td className="weather-cell">{record.sourceId}</td>
                     </tr>
                   ))}
               </tbody>
@@ -840,8 +843,9 @@ export function History() {
       <div className="trust-note">
         <Database size={17} />
         <p>
-          History covers up to the last 31 days of stored observations. Older
-          observations are deleted after 30 days.
+          Public history covers at most 30 days of permitted observations.
+          Expired records are excluded immediately; background storage cleanup
+          can take longer. No Google traffic history is stored or exported.
         </p>
       </div>
     </>
@@ -913,11 +917,9 @@ export function Quality() {
       <div className="info-grid">
         <section className="panel explanatory">
           <Clock3 size={22} />
-          <h3>Collection has a daily window.</h3>
+          <h3>Live estimates are requested, not scheduled.</h3>
           <p>
-            Google Cloud collects every 30 minutes from 06:00 to 22:30 Tanzania
-            time. There are no overnight updates. Delivery can be delayed;
-            always check the observation time.
+            Use the refresh button when you need a new Google reading. There is no background Google history collection. Always check the time shown; a previous reading does not guarantee current conditions.
           </p>
         </section>
         <section className="panel explanatory">
@@ -940,7 +942,7 @@ export function About() {
       <PageHeading
         eyebrow="MADE TO BE UNDERSTOOD"
         title="Useful traffic information. Clear limits."
-        description="Dar Traffic brings together recorded estimates for 21 corridors in Dar es Salaam."
+        description="Dar Traffic shows on-demand estimates for 21 corridors and keeps independent history separate."
       />
       <section className="about-intro">
         <div className="about-symbol">
@@ -950,13 +952,10 @@ export function About() {
           <span className="eyebrow small">THE IDEA</span>
           <h2>A little more context for the roads we share.</h2>
           <p>
-            The city moves differently from one road to the next. This website
-            lets you inspect specific corridors, compare their traffic estimates
-            with a baseline, and see the observations behind the numbers.
+            I started Dar Traffic because I wanted useful, honest information about the roads we use in Dar es Salaam. You can inspect a corridor, understand its estimate and see where the data comes from.
           </p>
           <p>
-            It is an observation tool. It doesn’t claim to measure every street,
-            predict your next journey, or control traffic signals.
+            My longer-term goal is to train a useful traffic model. First I need independent data I have permission to use, and evidence that the model works. That work is still ahead.
           </p>
         </div>
       </section>
@@ -969,7 +968,7 @@ export function About() {
           [
             "01",
             "Collect",
-            "A Google-hosted job requests traffic-aware travel times and route distance for configured endpoints.",
+            "An on-demand Google Cloud service requests traffic-aware estimates for configured endpoints. It does not store the response.",
           ],
           [
             "02",
@@ -1023,7 +1022,7 @@ export function About() {
           <h3>Sources and collection</h3>
           <p>
             Travel estimates: Google Distance Matrix. Weather context:
-            Open-Meteo. Collection: Google Cloud Scheduler and Cloud Run. The
+            Open-Meteo. Live service: Google Cloud Run. The
             website reads stored observations; refreshing does not start
             collection.
           </p>
